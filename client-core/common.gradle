@@ -3,6 +3,8 @@
 
 def coreDir = rootProject.file('client-core')
 
+repositories { mavenCentral() }
+
 base { archivesName = "cobalmoon-core-mc${project.minecraft_version}" }
 
 sourceSets {
@@ -106,6 +108,10 @@ def bundledFabricModules = ['fabric-api-base', 'fabric-screen-api-v1', 'fabric-r
 
 dependencies {
     bundledFabricModules.each { include fabricApi.module(it, project.fabric_api_version) }
+
+    // Lua for community scripts (pure Java, MIT). Bundled; only a sandboxed subset is exposed.
+    implementation 'org.luaj:luaj-jse:3.0.1'
+    include 'org.luaj:luaj-jse:3.0.1'
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'

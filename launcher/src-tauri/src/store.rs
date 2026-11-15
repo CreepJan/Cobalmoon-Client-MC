@@ -36,6 +36,8 @@ pub struct Settings {
     pub core_mods_dir: String,
     pub reduce_motion: bool,
     pub default_memory_mb: u32,
+    /// Launcher theme overrides: token name (e.g. "accent") → "#RRGGBB". Empty = Cobalmoon palette.
+    pub theme: std::collections::BTreeMap<String, String>,
 }
 
 impl Settings {

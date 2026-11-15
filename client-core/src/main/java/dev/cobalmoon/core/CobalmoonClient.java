@@ -62,9 +62,13 @@ public final class CobalmoonClient implements ClientModInitializer {
         store = new ConfigStore(loader.getConfigDir().resolve("cobalmoon"));
         EventBus bus = new EventBus((event, error) ->
                 LOG.error("Handler for {} failed", event.getClass().getSimpleName(), error));
-        dev.cobalmoon.api.module.Module.setErrorHandler((m, t) ->
-                LOG.error("Module '{}' failed and was turned off; the game keeps running", m.id(), t));
+        dev.cobalmoon.api.module.Module.setErrorHandler((m, t) -> {
+            if (t instanceof dev.cobalmoon.core.script.ScriptModule.NotGranted) LOG.info(t.getMessage());
+            else if (m instanceof dev.cobalmoon.core.script.ScriptModule) LOG.warn("Script '{}' was turned off: {}", m.id(), t.getMessage());
+            else LOG.error("Module '{}' failed and was turned off; the game keeps running", m.id(), t);
+        });
         settings = new ClientSettings(store);
+        dev.cobalmoon.core.ui.Theme.init(store);
         modules = new ModuleManager(bus, store);
         CoreApi api = new CoreApi(CoreApi.clientVersion(loader), CoreApi.minecraftVersion(loader), modules, bus);
         Cobalmoon.install(api);
@@ -105,6 +109,14 @@ public final class CobalmoonClient implements ClientModInitializer {
         // Other
         modules.register(new SafeServerModule(() -> modules, () -> combat.server(), store.root()));
         modules.register(new dev.cobalmoon.core.modules.ServerProfilesModule(() -> modules, () -> combat.server(), store.root()));
+        // Community scripts (config/cobalmoon/scripts); each one is isolated so a broken script cannot stop the others.
+        for (var script : dev.cobalmoon.core.script.ScriptLoader.load(store.root())) {
+            try {
+                modules.register(script);
+            } catch (RuntimeException e) {
+                LOG.warn("Could not register script {}: {}", script.id(), e.getMessage());
+            }
+        }
 
         zoom.bindKey(Platform.registerKey("key.cobalmoon.zoom", GLFW_KEY_C));
         List<KeyMapping> slotKeys = new ArrayList<>();

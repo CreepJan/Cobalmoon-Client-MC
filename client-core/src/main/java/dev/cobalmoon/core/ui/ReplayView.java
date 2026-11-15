@@ -116,7 +116,7 @@ public final class ReplayView {
 
         // grid (one line per block when zoomed in, every 5 otherwise)
         int step = scale >= 12 ? 1 : 5;
-        int grid = Theme.withAlpha(DefaultTokens.LUNAR, 0x22);
+        int grid = Theme.withAlpha(Theme.muted(), 0x22);
         for (int gx = (int) Math.ceil(minX / step) * step; gx <= maxX; gx += step) {
             int px = Math.round(ox + gx * scale);
             c.fill(px, my1, px + 1, my2, grid);
@@ -126,7 +126,7 @@ public final class ReplayView {
             c.fill(mx1, pz, mx2, pz + 1, grid);
         }
 
-        int self = DefaultTokens.ACCENT, opp = DefaultTokens.DANGER;
+        int self = Theme.accent(), opp = Theme.danger();
         for (float[] s : r.track()) {
             boolean past = s[0] <= t;
             dot(c, ox + s[1] * scale, oz + s[2] * scale, 1, past ? self : Theme.withAlpha(self, 0x40));
@@ -142,7 +142,7 @@ public final class ReplayView {
         float[] p = at(r.track(), t);
         float sx = ox + p[0] * scale, sz = oz + p[1] * scale;
         double yaw = Math.toRadians(p[2]);
-        for (int i = 2; i <= 10; i += 2) dot(c, sx + (float) (-Math.sin(yaw) * i), sz + (float) (Math.cos(yaw) * i), 0, DefaultTokens.STONE);
+        for (int i = 2; i <= 10; i += 2) dot(c, sx + (float) (-Math.sin(yaw) * i), sz + (float) (Math.cos(yaw) * i), 0, Theme.text());
         dot(c, sx, sz, 3, self);
         if (!Float.isNaN(p[3])) dot(c, ox + p[3] * scale, oz + p[4] * scale, 3, opp);
 

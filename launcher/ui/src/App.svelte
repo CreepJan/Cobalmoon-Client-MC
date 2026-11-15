@@ -14,6 +14,7 @@
     type VersionOption,
   } from "./lib/api";
   import ImportDialog from "./lib/ImportDialog.svelte";
+  import { THEME_TOKENS, applyTheme, color, contrastWarnings } from "./lib/theme";
   import ModsPanel from "./lib/ModsPanel.svelte";
 
   let showImport = $state(false);
@@ -47,7 +48,15 @@
   $effect(() => {
     if (settings?.reduceMotion) document.documentElement.setAttribute("data-reduce-motion", "");
     else document.documentElement.removeAttribute("data-reduce-motion");
+    applyTheme(settings?.theme ?? {});
   });
+
+  const themeWarnings = $derived(settings ? contrastWarnings(settings.theme ?? {}) : []);
+
+  function setThemeColor(key: string, value: string) {
+    if (!settings) return;
+    settings.theme = { ...(settings.theme ?? {}), [key]: value.toUpperCase() };
+  }
 
   async function refresh() {
     [settings, accounts, instances] = await Promise.all([api.getSettings(), api.listAccounts(), api.listInstances()]);
@@ -341,6 +350,23 @@
         <input type="number" min="1024" step="512" bind:value={settings.defaultMemoryMb} />
       </label>
       <label class="check"><input type="checkbox" bind:checked={settings.reduceMotion} /> Reducir animaciones</label>
+      <fieldset class="theme">
+        <legend>Tema del launcher</legend>
+        <div class="swatches">
+          {#each Object.entries(THEME_TOKENS) as [key, token] (key)}
+            <label class="swatch">
+              <input type="color" value={color(settings.theme ?? {}, key).toLowerCase()} oninput={(e) => setThemeColor(key, e.currentTarget.value)} />
+              <span>{token.label}</span>
+            </label>
+          {/each}
+        </div>
+        {#if themeWarnings.length}
+          <ul class="warnings" role="status">{#each themeWarnings as w (w)}<li>⚠ Contraste bajo — {w}</li>{/each}</ul>
+        {:else}
+          <p class="hint">Contraste correcto (WCAG AA).</p>
+        {/if}
+        <button type="button" class="btn ghost" onclick={() => settings && (settings.theme = {})}>Restablecer tema Cobalmoon</button>
+      </fieldset>
       <p class="hint">Cobalmoon no recoge telemetría. Tus tokens se guardan en el almacén de credenciales del sistema.</p>
       <div class="actions">
         <button type="button" class="btn ghost" onclick={() => (showSettings = false)}>Cancelar</button>
@@ -634,5 +660,48 @@
     display: flex;
     gap: 8px;
     align-items: center;
+  }
+  .theme {
+    border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 35%, transparent);
+    border-radius: var(--cm-radius-md);
+    padding: 10px 12px;
+    display: grid;
+    gap: 10px;
+  }
+  .theme legend {
+    color: var(--cm-color-lunar);
+    font-size: 12px;
+    padding: 0 4px;
+  }
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px 10px;
+  }
+  .swatch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .swatch input {
+    width: 26px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 45%, transparent);
+    border-radius: var(--cm-radius-sm);
+    background: none;
+    cursor: pointer;
+  }
+  .warnings {
+    margin: 0;
+    padding-left: 16px;
+    color: var(--cm-color-warning);
+    font-size: 12px;
+  }
+  .dialog {
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
   }
 </style>

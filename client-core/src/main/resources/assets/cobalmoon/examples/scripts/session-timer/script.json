@@ -1,0 +1,9 @@
+{
+  "id": "session-timer",
+  "name": "Session timer",
+  "version": "1.0",
+  "author": "Cobalmoon",
+  "description": "Example script: time played this session and hits landed.",
+  "main": "main.lua",
+  "permissions": ["hud.draw", "combat.read"]
+}

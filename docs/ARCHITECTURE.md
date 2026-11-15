@@ -1,5 +1,20 @@
 # Cobalmoon Client — Arquitectura y plan por fases
 
+> **Cómo quedó en la v1.0.** Este documento es el plan original. Donde la implementación se apartó de él:
+>
+> | Plan | v1.0 | Motivo |
+> |---|---|---|
+> | Stonecutter | Subproyectos `client-core/versions/<mc>` que comparten `client-core/src`; las diferencias de API van en clases puente por versión (`Platform`, `VersionCanvas`, `EditorScreen` y algunos mixins) | 26.x sin ofuscar y 1.21.11 con mapeos de Mojang usan plugins de Loom distintos; los subproyectos lo hacen explícito y sin preprocesador |
+> | `/modules` y `/scripting` como proyectos Gradle | Paquetes `modules/` y `script/` dentro de `client-core` | Un solo jar por versión de Minecraft, que el launcher inyecta con `fabric.addMods` |
+> | Lua con Cobalt | Lua 5.2 con **LuaJ 3.0.1** (incluido jar-in-jar) | Disponible en Maven Central; sandbox propio con presupuesto de instrucciones ([scripting.md](scripting.md)) |
+> | `script.toml`; permisos `input.read`, `http:<dominio>`, `fs.own` | `script.json`; permisos `hud.draw`, `chat.read`, `chat.send`, `player.read`, `combat.read`, `storage` | Sin red ni archivos en la v1.0: menos superficie de ataque. El almacén privado sustituye a `fs.own` |
+> | Códigos `CBM1:` con zstd | deflate (JDK) + base64url; temas con `CBT1:` ([themes.md](themes.md)) | Sin dependencias nativas |
+> | pnpm | npm (`package-lock.json`) | Viene con Node |
+> | Historial de peleas en SQLite o JSON | JSON | Sin dependencias |
+> | Entrenamiento con un datapack propio | Ejercicios en cualquier mundo local ([phase5.md](phase5.md)) | No hace falta instalar nada |
+> | Updater de Tauri firmado con minisign | Pendiente | Necesita una clave de firma y un sitio de publicación |
+> | Instaladores firmados | Sin firmar, con SHA-256 publicados | Los certificados cuestan dinero |
+
 ## Contexto
 Construir desde cero un cliente PvP para Minecraft Java: gratuito, de código abierto, muy personalizable y compatible con mods e instalaciones externas. Se parte de un directorio vacío. Decisiones ya tomadas por ti:
 - **Versiones:** 26.x (última: 26.3) + 1.21.11. La 1.8.9 llega después de la v1.0 como port en Ornithe.

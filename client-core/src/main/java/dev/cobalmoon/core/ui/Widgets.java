@@ -56,13 +56,21 @@ public final class Widgets {
 
         public Header(Supplier<String> text) { this.text = text; }
 
-        @Override protected int height() { return 16; }
+        private List<String> lines = List.of();
+
+        @Override protected int height() { return 6 + Math.max(1, lines.size()) * 10; }
 
         @Override int preferredWidth(GuiCanvas c) { return c.textWidth(text.get().toUpperCase(Locale.ROOT)) + 14; }
 
+        @Override void layout(GuiCanvas c, int w) { lines = wrap(c, text.get().toUpperCase(Locale.ROOT), w - 12); }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
-            c.text(ellipsize(c, text.get().toUpperCase(Locale.ROOT), w - 12), x + 6, y + 6, Theme.muted(), false);
+            int ly = y + 6;
+            for (String l : lines) {
+                c.text(l, x + 6, ly, Theme.muted(), false);
+                ly += 10;
+            }
         }
     }
 
@@ -330,20 +338,30 @@ public final class Widgets {
             this.primary = primary;
         }
 
-        @Override protected int height() { return 22; }
+        private List<String> lines = List.of();
+
+        @Override protected int height() { return 12 + Math.max(1, lines.size()) * 10; }
 
         @Override int preferredWidth(GuiCanvas c) { return c.textWidth(label.get()) + 28; }
 
+        @Override void layout(GuiCanvas c, int w) { lines = wrap(c, label.get(), w - 20); }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
-            int bx1 = x + 6, bx2 = x + w - 6, by1 = y + 3, by2 = y + 19;
+            int bx1 = x + 6, bx2 = x + w - 6, by1 = y + 3, by2 = y + height() - 3;
+            int textColor;
             if (primary) {
                 c.fill(bx1, by1, bx2, by2, hovered ? Theme.accentStrong() : Theme.accent());
-                c.centeredText(label.get(), (bx1 + bx2) / 2, by1 + 4, Theme.onAccent(), false);
+                textColor = Theme.onAccent();
             } else {
                 c.fill(bx1, by1, bx2, by2, hovered ? Theme.hover() : Theme.panelSunken());
                 c.outline(bx1, by1, bx2 - bx1, by2 - by1, Theme.border());
-                c.centeredText(label.get(), (bx1 + bx2) / 2, by1 + 4, Theme.text(), false);
+                textColor = Theme.text();
+            }
+            int ly = by1 + 4;
+            for (String l : lines.isEmpty() ? List.of(label.get()) : lines) {
+                c.centeredText(l, (bx1 + bx2) / 2, ly, textColor, false);
+                ly += 10;
             }
         }
 
@@ -496,6 +514,7 @@ public final class Widgets {
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Row forSetting(Setting<?> s) {
         if (s instanceof ActionSetting a) return new Button(() -> Tr.of(a.name()), a::run, false);
+        if (s instanceof dev.cobalmoon.api.setting.InfoSetting info) return new Label(info::text);
         if (s instanceof StringSetting str) return new TextField(str);
         if (s instanceof BooleanSetting b) return Toggle.of(b);
         if (s instanceof NumberSetting n) return Slider.of(n);

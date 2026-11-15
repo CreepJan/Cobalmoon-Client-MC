@@ -11,6 +11,8 @@ public enum Category {
     /** Fight analysis and practice: measures your play, never plays for you. */
     TRAINING,
     PERFORMANCE,
+    /** Community Lua scripts (sandboxed, with permissions the player grants). */
+    SCRIPTS,
     OTHER;
 
     /** Translation key, e.g. {@code cobalmoon.category.hud}. */

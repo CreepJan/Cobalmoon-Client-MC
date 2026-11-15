@@ -5,6 +5,7 @@ package dev.cobalmoon.gametest;
 
 import dev.cobalmoon.api.Cobalmoon;
 import dev.cobalmoon.api.hud.HudElement;
+import dev.cobalmoon.api.module.Category;
 import dev.cobalmoon.api.module.Module;
 import dev.cobalmoon.core.CobalmoonClient;
 import dev.cobalmoon.core.compat.Platform;
@@ -54,9 +55,13 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
                     "hitsounds", "toggle_sprint", "hotbar_binds", "auto_messages", "safe_server")), "modules: " + ids);
             if (Boolean.getBoolean("cobalmoon.test.enableAllModules")) {
                 // Every module was enabled during startup: all must still be on (none failed) and the game is running.
+                // Scripts are the exception: without granted permissions they must refuse to start, even when forced.
                 List<String> off = ctx.computeOnClient(mc -> Cobalmoon.api().modules().all().stream()
-                        .filter(m -> !m.isEnabled()).map(Module::id).toList());
+                        .filter(m -> !m.isEnabled() && m.category() != Category.SCRIPTS).map(Module::id).toList());
                 check(off.isEmpty(), "modules that failed to start enabled: " + off);
+                List<String> forcedScripts = ctx.computeOnClient(mc -> Cobalmoon.api().modules().all().stream()
+                        .filter(m -> m.isEnabled() && m.category() == Category.SCRIPTS).map(Module::id).toList());
+                check(forcedScripts.isEmpty(), "scripts without granted permissions must stay off: " + forcedScripts);
                 ctx.takeScreenshot("cobalmoon-all-modules");
                 return;
             }
@@ -399,9 +404,42 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
                 "aim result measured the practice target in front of the player: " + aimResult);
         ctx.takeScreenshot("cobalmoon-training-aim");
         ctx.waitTicks(10);
+        phase6Checks(ctx);
         check(ctx.computeOnClient(mc -> mc.level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
                 mc.player.getBoundingBox().inflate(10), e -> e.getType().getDescriptionId().equals("entity.minecraft.villager")).isEmpty()),
                 "practice target removed afterwards");
+    }
+
+    /** Phase 6: example scripts need a grant, then run and draw; theme editor flags unreadable colours. */
+    private static void phase6Checks(ClientGameTestContext ctx) {
+        var script = (dev.cobalmoon.core.script.ScriptModule) module("script.session-timer");
+        check(!ctx.computeOnClient(mc -> script.isEnabled()), "example script starts off");
+        ctx.runOnClient(mc -> script.setEnabled(true));
+        check(!ctx.computeOnClient(mc -> script.isEnabled()), "a script cannot run before its permissions are granted");
+        ctx.runOnClient(mc -> script.grantAndEnable());
+        ctx.waitTicks(10);
+        check(ctx.computeOnClient(mc -> script.isEnabled()), "granted script runs: " + ctx.computeOnClient(mc -> script.status()));
+        List<String> lines = ctx.computeOnClient(mc -> script.hudElements().get(0).isVisible()
+                ? List.of("visible") : List.of());
+        check(!lines.isEmpty(), "script draws its HUD element");
+        ctx.takeScreenshot("cobalmoon-script");
+
+        // Theme: an unreadable choice is flagged; reset restores the palette.
+        ctx.getInput().pressKey(RIGHT_SHIFT);
+        ctx.waitFor(mc -> Platform.currentEditor() != null);
+        ctx.runOnClient(mc -> {
+            dev.cobalmoon.core.ui.Theme.set("accent", 0xFFFF8A3D);
+            dev.cobalmoon.core.ui.Theme.set("night-raised", 0xFF2A1A3A);
+        });
+        ctx.waitTicks(5);
+        ctx.takeScreenshot("cobalmoon-theme");
+        ctx.runOnClient(mc -> {
+            dev.cobalmoon.core.ui.Theme.set("stone", 0xFF3A3040);
+            check(Platform.currentEditor().contrastText().contains("⚠"), "low contrast flagged: " + Platform.currentEditor().contrastText());
+            dev.cobalmoon.core.ui.Theme.reset();
+            check(!Platform.currentEditor().contrastText().contains("⚠"), "default theme is readable");
+            Platform.closeScreen();
+        });
     }
 
     /** Each jar passed through fabric.addMods must belong to a loaded mod. Returns "id version" strings. */

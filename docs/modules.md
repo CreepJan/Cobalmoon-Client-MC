@@ -61,6 +61,12 @@ public final class PingModule extends Module {
 | `NumberSetting(min, max, step)` | Deslizador |
 | `ColorSetting` (ARGB) | Muestras de la paleta; la rueda cambia la transparencia |
 | `EnumSetting` | Botón que cicla valores (clic derecho: hacia atrás) |
+| `StringSetting(maxLength)` | Campo de texto |
+| `ActionSetting(runnable)` | Botón que ejecuta una acción (no se guarda) |
+| `InfoSetting(supplier)` | Texto de solo lectura: estado, ayuda (no se guarda) |
+
+Cualquier setting se puede ocultar con `setHidden(true)`. Categorías: `HUD`, `VISUAL`, `GAMEPLAY`, `TRAINING`,
+`PERFORMANCE`, `SCRIPTS` (reservada a los scripts Lua, ver [scripting.md](scripting.md)) y `OTHER`.
 
 - **Activación en caliente:** los handlers declarados con `on(...)` se suscriben al activar y se eliminan al desactivar.
 - **Aislamiento de errores:** si tu handler o tu elemento de HUD lanza una excepción, se registra en el log y el resto del cliente sigue funcionando.

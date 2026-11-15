@@ -48,7 +48,7 @@ const hits: SearchHit[] = [
 ];
 
 const handlers: Record<string, (a: any) => unknown> = {
-  get_settings: () => ({ clientId: "", coreModsDir: "", reduceMotion: false, defaultMemoryMb: 4096 }),
+  get_settings: () => ({ clientId: "", coreModsDir: "", reduceMotion: false, defaultMemoryMb: 4096, theme: {} }),
   save_settings: (a) => a.settings,
   list_accounts: () => [{ uuid: "0", name: "DemoPlayer", xuid: "" }],
   list_versions: () => ["26.3", "26.2", "26.1.2", "1.21.11", "1.21.10", "1.21.1", "1.20.1"].map((id) => ({ id, cobalmoon: id === "26.3" || id === "1.21.11" })),

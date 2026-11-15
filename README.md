@@ -8,7 +8,25 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 > Cobalmoon Client no está afiliado a Mojang ni a Microsoft. «Minecraft» es una marca de Mojang Synergies AB.
 > El launcher descarga el juego de los servidores oficiales de Mojang; no redistribuimos su código ni sus assets.
 
-## Estado: Fase 5 (beta)
+## Estado: v1.0 (fase 6)
+
+**Fase 6:** scripts, temas, documentación e instaladores.
+- **[Scripts Lua](docs/scripting.md):**
+  - Añaden elementos al HUD, reaccionan a golpes y al chat y guardan datos.
+  - Se ejecutan en un sandbox con permisos que concedes tú.
+  - Sin archivos, red ni comandos, y con límite de CPU: un bucle infinito no congela el juego.
+  - Se incluyen dos ejemplos: *Session timer* y *Best combo*.
+- **[Editor de temas](docs/themes.md):**
+  - Colores del juego y del launcher, con aviso de contraste WCAG.
+  - Los temas se comparten con códigos `CBT1:`.
+- **Instaladores:** `.msi` y `.exe` en Windows, `.dmg` en macOS, `.AppImage` y `.deb` en Linux. Van sin firmar y con SHA-256 publicados.
+- **Documentación:** [scripts](docs/scripting.md), [temas](docs/themes.md), [módulos/addons](docs/modules.md), [CONTRIBUTING](CONTRIBUTING.md) y [SECURITY](SECURITY.md).
+
+> El login con Microsoft del launcher necesita que Mojang apruebe el client ID de Azure ([guía](docs/azure-app.md)).
+> Hasta entonces, el mod se prueba con `runClient`.
+
+### Fase 5
+
 
 **Fase 5: diferenciadores** ([detalles](docs/phase5.md)):
 - **Análisis post-pelea:** comparado con tus peleas anteriores.
@@ -68,7 +86,7 @@ api/            API pública para addons (LGPL-3.0)
 client-core/    Mod Fabric: src/ compartido + versions/<mc>/ por versión de Minecraft
 design-tokens/  tokens.json (fuente única de la paleta), logo, scripts de generación y contraste
 launcher/       Launcher Tauri 2 (Rust en src-tauri/, Svelte 5 en ui/)
-docs/           Arquitectura, tokens, guía de Azure
+docs/           Arquitectura, guías de módulos, scripts, temas, compatibilidad y Azure
 ```
 
 ## Compilar

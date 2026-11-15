@@ -7,6 +7,8 @@ export interface Settings {
   coreModsDir: string;
   reduceMotion: boolean;
   defaultMemoryMb: number;
+  /** Token name → "#RRGGBB" overrides of the launcher theme. */
+  theme: Record<string, string>;
 }
 
 export interface Account {

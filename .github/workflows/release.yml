@@ -61,3 +61,17 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Cobalmoon Client ${{ github.ref_name }}
           releaseDraft: true
+
+  checksums:
+    needs: installers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish SHA-256 sums of every installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*'
+          sha256sum -- * | tee SHA256SUMS.txt
+          gh release upload "$TAG" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber

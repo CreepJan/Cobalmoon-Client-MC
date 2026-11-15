@@ -1,0 +1,9 @@
+{
+  "id": "best-combo",
+  "name": "Best combo",
+  "version": "1.0",
+  "author": "Cobalmoon",
+  "description": "Example script: your longest chain of hits (within 2 s of each other), this session and all time.",
+  "main": "main.lua",
+  "permissions": ["hud.draw", "combat.read", "storage"]
+}

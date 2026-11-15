@@ -65,6 +65,27 @@ public final class ConfigShare {
     }
 
     public static String encode(Map<String, Object> data) {
+        return pack(PREFIX, data);
+    }
+
+    /** Theme codes: {@code CBT1:} + the same packing. */
+    public static final String THEME_PREFIX = "CBT1:";
+
+    public static String encodeTheme(Map<String, Object> colors) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("v", 1);
+        root.put("theme", colors);
+        return pack(THEME_PREFIX, root);
+    }
+
+    /** Returns the colour map of a theme code. */
+    public static Map<?, ?> decodeTheme(String code) {
+        Map<String, Object> data = unpack(THEME_PREFIX, code);
+        if (!(data.get("theme") instanceof Map<?, ?> m)) throw new IllegalArgumentException("code has no theme");
+        return m;
+    }
+
+    static String pack(String prefix, Map<String, Object> data) {
         byte[] json = GSON.toJson(data).getBytes(StandardCharsets.UTF_8);
         Deflater d = new Deflater(Deflater.BEST_COMPRESSION);
         d.setInput(json);
@@ -73,18 +94,24 @@ public final class ConfigShare {
         byte[] buf = new byte[4096];
         while (!d.finished()) out.write(buf, 0, d.deflate(buf));
         d.end();
-        return PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(out.toByteArray());
+        return prefix + Base64.getUrlEncoder().withoutPadding().encodeToString(out.toByteArray());
     }
 
     /** Parses a code; throws {@link IllegalArgumentException} with a readable reason if it is not valid. */
     public static Map<String, Object> decode(String code) {
+        Map<String, Object> data = unpack(PREFIX, code);
+        if (!(data.get("modules") instanceof Map)) throw new IllegalArgumentException("code has no module data");
+        return data;
+    }
+
+    static Map<String, Object> unpack(String prefix, String code) {
         if (code == null) throw new IllegalArgumentException("empty");
         String c = code.replaceAll("\\s+", "");
-        if (!c.startsWith(PREFIX)) throw new IllegalArgumentException("not a Cobalmoon code (must start with " + PREFIX + ")");
+        if (!c.startsWith(prefix)) throw new IllegalArgumentException("not a Cobalmoon code (must start with " + prefix + ")");
         if (c.length() > MAX_CODE_CHARS) throw new IllegalArgumentException("code too long");
         byte[] packed;
         try {
-            packed = Base64.getUrlDecoder().decode(c.substring(PREFIX.length()));
+            packed = Base64.getUrlDecoder().decode(c.substring(prefix.length()));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("damaged code (invalid characters)");
         }
@@ -106,7 +133,7 @@ public final class ConfigShare {
         }
         try {
             Map<String, Object> data = GSON.fromJson(out.toString(StandardCharsets.UTF_8), new TypeToken<LinkedHashMap<String, Object>>() {}.getType());
-            if (data == null || !(data.get("modules") instanceof Map)) throw new IllegalArgumentException("code has no module data");
+            if (data == null) throw new IllegalArgumentException("empty code");
             return data;
         } catch (JsonParseException e) {
             throw new IllegalArgumentException("damaged code (invalid data)");

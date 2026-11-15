@@ -216,8 +216,52 @@ public final class HudEditor {
             rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.share.paste"), this::pasteCode, false));
             rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.share.save_file"), this::saveCodeFile, false));
             rows.add(new Widgets.Label(() -> shareStatus));
+            addThemeRows(rows);
         }
         right.setRows(rows);
+    }
+
+    // ---- theme editor -----------------------------------------------------------------------
+
+    private void addThemeRows(List<Row> rows) {
+        rows.add(new Widgets.Header(() -> Tr.of("cobalmoon.theme.title")));
+        rows.add(new Widgets.Label(this::contrastText));
+        for (String key : Theme.EDITABLE) {
+            rows.add(new Widgets.ColorPick(() -> Tr.of("cobalmoon.theme." + key), () -> Theme.get(key), v -> {
+                Theme.set(key, v);
+                refreshRight();
+            }));
+        }
+        rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.theme.copy"), () -> {
+            net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(ConfigShare.encodeTheme(Theme.toJson()));
+            shareStatus = Tr.of("cobalmoon.theme.copied");
+            refreshRight();
+        }, false));
+        rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.theme.paste"), () -> {
+            try {
+                int n = Theme.apply(ConfigShare.decodeTheme(net.minecraft.client.Minecraft.getInstance().keyboardHandler.getClipboard()));
+                shareStatus = Tr.of("cobalmoon.theme.applied", n);
+            } catch (IllegalArgumentException e) {
+                shareStatus = Tr.of("cobalmoon.share.invalid", e.getMessage());
+            }
+            refreshRight();
+        }, false));
+        rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.theme.reset"), () -> {
+            Theme.reset();
+            refreshRight();
+        }, false));
+    }
+
+    /** "Readable" or the list of pairs below their WCAG minimum. */
+    public String contrastText() {
+        var warnings = Theme.contrastWarnings();
+        if (warnings.isEmpty()) return Tr.of("cobalmoon.theme.contrast_ok");
+        StringBuilder sb = new StringBuilder(Tr.of("cobalmoon.theme.contrast_low"));
+        for (var w : warnings) {
+            sb.append(" ").append(Tr.of("cobalmoon.theme." + w.fg())).append(" / ").append(Tr.of("cobalmoon.theme." + w.bg()))
+                    .append(String.format(java.util.Locale.ROOT, " %.1f:1 (min %.1f).", w.ratio(), w.minimum()));
+        }
+        return sb.toString();
     }
 
     // ---- shareable configuration codes ----------------------------------------------------
@@ -316,7 +360,7 @@ public final class HudEditor {
                 return;
             }
             if (dragging) {
-                int faint = Theme.withAlpha(DefaultTokens.LUNAR, 0x30);
+                int faint = Theme.withAlpha(Theme.muted(), 0x30);
                 c.fill(screenW / 2, 0, screenW / 2 + 1, screenH, faint);
                 c.fill(0, screenH / 2, screenW, screenH / 2 + 1, faint);
             }
@@ -326,7 +370,7 @@ public final class HudEditor {
             for (HudElement e : editable()) {
                 HudRenderer.render(e, c, true, t -> CobalmoonClient.LOG.warn("HUD element {} failed to render", e.id(), t));
                 Bounds b = HudRenderer.bounds(e, c, true);
-                int color = selected.contains(e) ? Theme.accent() : e == hovered ? Theme.text() : Theme.withAlpha(DefaultTokens.LUNAR, 0x99);
+                int color = selected.contains(e) ? Theme.accent() : e == hovered ? Theme.text() : Theme.withAlpha(Theme.muted(), 0x99);
                 c.outline(b.x() - 1, b.y() - 1, b.w() + 2, b.h() + 2, color);
                 if (selected.size() == 1 && selected.contains(e)) {
                     // resize handle (bottom-right corner)
