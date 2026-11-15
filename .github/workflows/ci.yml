@@ -75,7 +75,10 @@ jobs:
           xvfb-run -a -s "-screen 0 1280x720x24" glxinfo -B | head -20 || true
       - name: Client game test
         env:
-          # 26.x opens its window with SDL3; under Xvfb its GLX visual lookup fails, EGL works.
+          # 26.x opens its window with SDL3; under Xvfb its GLX visual lookup fails ("Couldn't find matching
+          # GLX visual"), so use EGL. Without OpenGL the game falls back to Vulkan, but Iris needs OpenGL.
+          # SDL3 name first; the SDL2 name is kept for older builds.
+          SDL_VIDEO_FORCE_EGL: "1"
           SDL_VIDEO_X11_FORCE_EGL: "1"
         run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :client-core:mc-${{ matrix.mc }}:runClientGameTest ${{ matrix.mods }}
       - uses: actions/upload-artifact@v4
