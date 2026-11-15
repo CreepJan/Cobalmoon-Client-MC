@@ -112,7 +112,7 @@ Instaladores (`.msi`, `.dmg`, `.AppImage`, `.deb`): `cd launcher && npm run taur
 ## Tests
 
 ```bash
-node --test design-tokens/scripts/ && node design-tokens/scripts/check-contrast.mjs
+node --test design-tokens/scripts/*.test.mjs && node design-tokens/scripts/check-contrast.mjs
 ```
 
 ```bash

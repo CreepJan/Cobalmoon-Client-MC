@@ -42,6 +42,10 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
             dev.cobalmoon.core.CobalmoonClient.LOG.info("Compatibility test running alongside: {}", loaded);
         }
 
+        // CI machines render in software (no GPU): Fabric waits at most one minute for the spawn chunks to be
+        // built, which a render distance of 5 (121 chunks) can exceed. 2 (25 chunks) is plenty for these checks.
+        ctx.runOnClient(mc -> mc.options.renderDistance().set(2));
+
         try (TestSingleplayerContext world = ctx.worldBuilder().create()) {
             ctx.waitTicks(40);
             if (System.getProperty("cobalmoon.compat") != null) {

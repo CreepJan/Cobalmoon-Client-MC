@@ -19,7 +19,7 @@ jobs:
       - name: WCAG contrast
         run: node design-tokens/scripts/check-contrast.mjs
       - name: Token unit tests
-        run: node --test design-tokens/scripts/
+        run: node --test design-tokens/scripts/*.test.mjs
       - name: Generated files are up to date
         run: node design-tokens/scripts/build.mjs --check
 
@@ -50,6 +50,8 @@ jobs:
     # Starts the real game (software rendering under Xvfb), creates a world, drives the modules and
     # the HUD editor, and uploads the screenshots.
     runs-on: ubuntu-latest
+    # A game that cannot open its window hangs instead of exiting: fail fast rather than after 6 hours.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -66,9 +68,15 @@ jobs:
             21
             25
       - uses: gradle/actions/setup-gradle@v4
-      - name: Xvfb and Mesa
-        run: sudo apt-get update && sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri
+      - name: Xvfb and Mesa (OpenGL, EGL and the lavapipe Vulkan driver)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri libegl1 libegl-mesa0 mesa-vulkan-drivers
+          xvfb-run -a -s "-screen 0 1280x720x24" glxinfo -B | head -20 || true
       - name: Client game test
+        env:
+          # 26.x opens its window with SDL3; under Xvfb its GLX visual lookup fails, EGL works.
+          SDL_VIDEO_X11_FORCE_EGL: "1"
         run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :client-core:mc-${{ matrix.mc }}:runClientGameTest ${{ matrix.mods }}
       - uses: actions/upload-artifact@v4
         if: always()
