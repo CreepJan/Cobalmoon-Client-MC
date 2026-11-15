@@ -6,7 +6,15 @@
   "mixinPriority": 1100,
   "client": [
     "MinecraftTitleMixin",
-    "MouseHandlerMixin"
+    "MouseHandlerMixin",
+    "MouseScrollMixin",
+    "MultiPlayerGameModeMixin",
+    "OverlayTextureMixin",
+    "ChatMixin",
+    "FireMixin",
+    "FogMixin",
+    "FovMixin",
+    "ShieldMixin"
   ],
   "injectors": {
     "defaultRequire": 1

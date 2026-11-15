@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -107,19 +108,51 @@ public abstract class Module {
 
     protected void onDisable() {}
 
+    private static volatile BiConsumer<Module, Throwable> errorHandler = (m, t) -> {
+        System.err.println("[Cobalmoon] module " + m.id() + " failed: " + t);
+        t.printStackTrace();
+    };
+
+    /** Where module failures are reported (the client sets this to its logger). */
+    public static void setErrorHandler(BiConsumer<Module, Throwable> handler) {
+        errorHandler = Objects.requireNonNull(handler);
+    }
+
+    /**
+     * Runs {@link #onEnable()}. If it throws, the failure is reported, the module is turned back off
+     * and the game keeps running: a broken module must never crash the client.
+     */
+    private boolean activate() {
+        for (Handler<?> h : handlers) active.add(h.subscribe(bus));
+        try {
+            onEnable();
+            return true;
+        } catch (Throwable t) {
+            errorHandler.accept(this, t);
+            active.forEach(EventBus.Subscription::cancel);
+            active.clear();
+            enabled = false;
+            return false;
+        }
+    }
+
+    private void deactivate() {
+        try {
+            onDisable();
+        } catch (Throwable t) {
+            errorHandler.accept(this, t);
+        }
+        active.forEach(EventBus.Subscription::cancel);
+        active.clear();
+    }
+
     /** Enables or disables the module (hot: takes effect immediately). */
     public final void setEnabled(boolean value) {
         if (value == enabled) return;
         enabled = value;
         if (bus != null) {
-            if (value) {
-                for (Handler<?> h : handlers) active.add(h.subscribe(bus));
-                onEnable();
-            } else {
-                onDisable();
-                active.forEach(EventBus.Subscription::cancel);
-                active.clear();
-            }
+            if (value) activate();
+            else deactivate();
         }
         for (Consumer<Module> l : toggleListeners) l.accept(this);
     }
@@ -136,10 +169,7 @@ public abstract class Module {
     public final void bind(EventBus bus) {
         if (this.bus != null) throw new IllegalStateException("module " + id + " is already registered");
         this.bus = Objects.requireNonNull(bus);
-        if (enabled) {
-            for (Handler<?> h : handlers) active.add(h.subscribe(bus));
-            onEnable();
-        }
+        if (enabled) activate();
     }
 
     public final Setting<?> setting(String key) {

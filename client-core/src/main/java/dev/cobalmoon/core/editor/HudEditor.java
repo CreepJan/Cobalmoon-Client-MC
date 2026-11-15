@@ -16,6 +16,7 @@ import dev.cobalmoon.core.modules.CrosshairModule;
 import dev.cobalmoon.core.render.GuiCanvas;
 import dev.cobalmoon.core.render.HudRenderer;
 import dev.cobalmoon.core.render.HudRenderer.Bounds;
+import dev.cobalmoon.core.ui.ColorPicker;
 import dev.cobalmoon.core.ui.Theme;
 import dev.cobalmoon.core.ui.Tr;
 import dev.cobalmoon.core.ui.Widgets;
@@ -64,6 +65,19 @@ public final class HudEditor {
     private Panel activePanel;
     private GuiCanvas lastCanvas;
 
+    // colour picker popup
+    private ColorPicker picker;
+    private boolean pickerDrag;
+
+    // "edit layout" / "back to settings" button at the top centre
+    private Bounds modeButton = new Bounds(0, 0, 0, 0);
+
+    // corner resize handle
+    private static final int HANDLE = 6;
+    private HudElement resizing;
+    private Bounds resizeStart;
+    private float resizeStartScale;
+
     public HudEditor(ModuleManager modules, ClientSettings settings, CrosshairModule crosshair) {
         this.modules = modules;
         this.settings = settings;
@@ -78,8 +92,37 @@ public final class HudEditor {
         // Provisional size; fitPanels() sizes the panels to their content on every frame.
         left.bounds(4, 4, 120, screenH - 8);
         right.bounds(screenW - 124, 4, 120, screenH - 8);
+        Widgets.setPickerOpener((title, get, set, rowY) -> openPicker(title, get, set, rowY));
         rebuildLeft();
         rebuildRight();
+    }
+
+    /** Opens the colour wheel next to the settings panel. */
+    public void openPicker(String title, java.util.function.IntSupplier get, java.util.function.IntConsumer set, int rowY) {
+        picker = new ColorPicker(title, get, set);
+        int px = Math.max(4, right.x - ColorPicker.WIDTH - 6);
+        int py = Math.max(4, Math.min(screenH - ColorPicker.HEIGHT - 4, rowY - 20));
+        picker.position(px, py);
+    }
+
+    public ColorPicker picker() { return picker; }
+
+    /** Switches between the full editor and the clean "move and resize" view. */
+    public void setLayoutMode(boolean layout) {
+        panelsVisible = !layout;
+        picker = null;
+        Widgets.TextField.blur();
+    }
+
+    public Bounds modeButton() { return modeButton; }
+
+    /** On-screen bounds of an element as last drawn by the editor (null before the first frame). */
+    public Bounds boundsOf(HudElement e) {
+        return lastCanvas == null ? null : HudRenderer.bounds(e, lastCanvas, true);
+    }
+
+    private Bounds handleOf(Bounds b) {
+        return new Bounds(b.right() - HANDLE + 2, b.bottom() - HANDLE + 2, HANDLE, HANDLE);
     }
 
     // ---- panels ---------------------------------------------------------------------------
@@ -138,7 +181,10 @@ public final class HudEditor {
         if (m != null && selected.size() <= 1) {
             if (!m.settings().isEmpty()) {
                 rows.add(new Widgets.Header(() -> Tr.of(m.name())));
-                for (Setting<?> s : m.settings()) rows.add(Widgets.forSetting(s));
+                rows.add(new Widgets.Label(() -> Tr.of(m.description())));
+                for (Setting<?> s : m.settings()) {
+                    if (!s.isHidden()) rows.add(Widgets.forSetting(s));
+                }
             } else if (el == null) {
                 rows.add(new Widgets.Header(() -> Tr.of(m.name())));
                 rows.add(new Widgets.Label(() -> Tr.of("cobalmoon.editor.no_settings")));
@@ -205,6 +251,12 @@ public final class HudEditor {
                 Bounds b = HudRenderer.bounds(e, c, true);
                 int color = selected.contains(e) ? Theme.accent() : e == hovered ? Theme.text() : Theme.withAlpha(DefaultTokens.LUNAR, 0x99);
                 c.outline(b.x() - 1, b.y() - 1, b.w() + 2, b.h() + 2, color);
+                if (selected.size() == 1 && selected.contains(e)) {
+                    // resize handle (bottom-right corner)
+                    Bounds h = handleOf(b);
+                    c.fill(h.x(), h.y(), h.right(), h.bottom(), Theme.accent());
+                    c.outline(h.x(), h.y(), h.w(), h.h(), Theme.onAccent());
+                }
             }
             for (Snapping.Guide g : guides) {
                 if (g.vertical()) c.fill(g.pos(), 0, g.pos() + 1, screenH, Theme.accent());
@@ -216,14 +268,40 @@ public final class HudEditor {
                     left.render(c, mx, my);
                     right.render(c, mx, my);
                 }
-                if (settings.editorHints.get()) {
-                    String hint = Tr.of("cobalmoon.editor.hint");
-                    int w = c.textWidth(hint) + 12;
-                    int x = screenW / 2 - w / 2, y = 6;
-                    if (!panelsVisible || (x > left.x + left.w && x + w < right.x)) {
-                        c.fill(x, y, x + w, y + 16, Theme.panel());
-                        c.centeredText(hint, screenW / 2, y + 4, Theme.muted(), false);
+                // Mode button: "Move & resize HUD" ⇄ "Back to settings".
+                String label = Tr.of(panelsVisible ? "cobalmoon.editor.layout_mode" : "cobalmoon.editor.back_to_settings");
+                int bw = c.textWidth(label) + 16, bx = screenW / 2 - bw / 2, by = 6;
+                modeButton = new Bounds(bx, by, bw, 16);
+                boolean hov = modeButton.contains(mx, my);
+                c.fill(bx, by, bx + bw, by + 16, hov ? Theme.accentStrong() : Theme.accent());
+                c.centeredText(label, screenW / 2, by + 4, Theme.onAccent(), false);
+
+                if (settings.editorHints.get() && !panelsVisible) {
+                    // Split the hint at " · " into as many lines as needed to fit the screen.
+                    List<String> lines = new ArrayList<>();
+                    StringBuilder line = new StringBuilder();
+                    for (String part : Tr.of("cobalmoon.editor.hint").split(" · ")) {
+                        String cand = line.isEmpty() ? part : line + " · " + part;
+                        if (!line.isEmpty() && c.textWidth(cand) > screenW - 24) {
+                            lines.add(line.toString());
+                            line.setLength(0);
+                            line.append(part);
+                        } else {
+                            line.setLength(0);
+                            line.append(cand);
+                        }
                     }
+                    lines.add(line.toString());
+                    int w = 0;
+                    for (String l : lines) w = Math.max(w, c.textWidth(l));
+                    w += 12;
+                    int h = lines.size() * 10 + 6, x = screenW / 2 - w / 2, y = screenH - h - 4;
+                    c.fill(x, y, x + w, y + h, Theme.panel());
+                    for (int i = 0; i < lines.size(); i++) c.centeredText(lines.get(i), screenW / 2, y + 4 + i * 10, Theme.muted(), false);
+                }
+                if (picker != null) {
+                    c.nextLayer();
+                    picker.render(c, mx, my);
                 }
             }
         } finally {
@@ -245,6 +323,30 @@ public final class HudEditor {
     public boolean mouseClicked(double mx, double my, int button, boolean shift) {
         GuiCanvas c = lastCanvas;
         if (c == null) return false;
+        Widgets.TextField.blur(); // a click on a text field focuses it again below
+        if (picker != null) {
+            if (picker.click(mx, my)) {
+                pickerDrag = true;
+                return true;
+            }
+            picker = null; // click outside (or "Done") closes it
+            if (!panelsVisible || !(left.contains(mx, my) || right.contains(mx, my))) return true;
+        }
+        if (modeButton.contains(mx, my)) {
+            setLayoutMode(panelsVisible);
+            return true;
+        }
+        if (selected.size() == 1 && button == 0) {
+            HudElement only = selected.iterator().next();
+            Bounds b = HudRenderer.bounds(only, c, true);
+            Bounds h = handleOf(b);
+            if (mx >= h.x() - 2 && mx < h.right() + 2 && my >= h.y() - 2 && my < h.bottom() + 2) {
+                resizing = only;
+                resizeStart = b;
+                resizeStartScale = only.layout().scale;
+                return true;
+            }
+        }
         for (Panel p : new Panel[]{left, right}) {
             if (panelsVisible && p.contains(mx, my)) {
                 activePanel = p;
@@ -283,6 +385,21 @@ public final class HudEditor {
     }
 
     public boolean mouseDragged(double mx, double my) {
+        if (pickerDrag && picker != null) {
+            picker.drag(mx, my);
+            return true;
+        }
+        if (resizing != null && lastCanvas != null) {
+            // Scale so the bottom-right corner follows the mouse; the top-left corner stays put.
+            double sx = (mx - resizeStart.x()) / Math.max(1.0, resizeStart.w());
+            double sy = (my - resizeStart.y()) / Math.max(1.0, resizeStart.h());
+            float factor = (float) Math.max(sx, sy);
+            HudLayout l = resizing.layout();
+            l.setScale(resizeStartScale * factor);
+            Bounds now = HudRenderer.bounds(resizing, lastCanvas, true);
+            l.moveTo(resizeStart.x(), resizeStart.y(), now.w(), now.h(), screenW, screenH);
+            return true;
+        }
         if (activePanel != null) {
             activePanel.drag(mx);
             return true;
@@ -309,6 +426,14 @@ public final class HudEditor {
     }
 
     public boolean mouseReleased(double mx, double my, int button) {
+        if (pickerDrag) {
+            pickerDrag = false;
+            if (picker != null) picker.release();
+        }
+        if (resizing != null) {
+            dirty(resizing);
+            resizing = null;
+        }
         if (activePanel != null) {
             activePanel.release();
             activePanel = null;
@@ -343,7 +468,17 @@ public final class HudEditor {
 
     public boolean panelsVisible() { return panelsVisible; }
 
+    /** Characters typed while a text field has focus. */
+    public boolean charTyped(String text) {
+        return Widgets.TextField.type(text);
+    }
+
     public boolean keyPressed(int key, boolean shift) {
+        if (Widgets.TextField.key(key)) return true;
+        if (picker != null && (key == 256 || key == 257)) { // Esc / Enter close the colour picker
+            picker = null;
+            return true;
+        }
         if (key == GLFW_KEY_TAB) {
             panelsVisible = !panelsVisible;
             return true;
@@ -367,6 +502,7 @@ public final class HudEditor {
 
     /** Called when the screen closes: persist everything now. */
     public void close() {
+        Widgets.TextField.blur();
         CobalmoonClient.flushConfig();
     }
 }

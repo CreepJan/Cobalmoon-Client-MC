@@ -53,6 +53,7 @@ final class VersionCanvas implements GuiCanvas {
     @Override public void clip(int x1, int y1, int x2, int y2) { g.enableScissor(x1, y1, x2, y2); }
     @Override public void endClip() { g.disableScissor(); }
     @Override public void nextLayer() { g.nextStratum(); }
+    @Override public void item(net.minecraft.world.item.ItemStack stack, int x, int y) { g.item(stack, x, y); }
     @Override public int screenWidth() { return g.guiWidth(); }
     @Override public int screenHeight() { return g.guiHeight(); }
 }

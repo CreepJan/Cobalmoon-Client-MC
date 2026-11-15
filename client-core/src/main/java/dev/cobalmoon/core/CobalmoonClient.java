@@ -7,7 +7,17 @@ import dev.cobalmoon.api.Cobalmoon;
 import dev.cobalmoon.api.event.EventBus;
 import dev.cobalmoon.api.event.Events;
 import dev.cobalmoon.api.hud.HudElement;
+import dev.cobalmoon.core.combat.CombatTracker;
 import dev.cobalmoon.core.compat.Platform;
+import dev.cobalmoon.core.modules.CombatHudModules;
+import dev.cobalmoon.core.modules.GameplayModules;
+import dev.cobalmoon.core.modules.HitColorModule;
+import dev.cobalmoon.core.modules.SafeServerModule;
+import dev.cobalmoon.core.modules.StatusHudModules;
+import dev.cobalmoon.core.modules.VisualModules;
+import dev.cobalmoon.core.modules.ZoomModule;
+import java.util.ArrayList;
+import java.util.List;
 import dev.cobalmoon.core.compat.TitleBranding;
 import dev.cobalmoon.core.config.ConfigStore;
 import dev.cobalmoon.core.editor.HudEditor;
@@ -35,8 +45,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CobalmoonClient implements ClientModInitializer {
     public static final Logger LOG = LoggerFactory.getLogger("Cobalmoon");
     private static final int GLFW_KEY_RIGHT_SHIFT = 344;
+    private static final int GLFW_KEY_C = 67;
+    private static final int GLFW_KEY_UNKNOWN = -1;
 
     private static ConfigStore store;
+    private static CombatTracker combat;
     private static ClientSettings settings;
     private static ModuleManager modules;
     private static CrosshairModule crosshair;
@@ -49,6 +62,8 @@ public final class CobalmoonClient implements ClientModInitializer {
         store = new ConfigStore(loader.getConfigDir().resolve("cobalmoon"));
         EventBus bus = new EventBus((event, error) ->
                 LOG.error("Handler for {} failed", event.getClass().getSimpleName(), error));
+        dev.cobalmoon.api.module.Module.setErrorHandler((m, t) ->
+                LOG.error("Module '{}' failed and was turned off; the game keeps running", m.id(), t));
         settings = new ClientSettings(store);
         modules = new ModuleManager(bus, store);
         CoreApi api = new CoreApi(CoreApi.clientVersion(loader), CoreApi.minecraftVersion(loader), modules, bus);
@@ -56,11 +71,43 @@ public final class CobalmoonClient implements ClientModInitializer {
         LOG.info("{} v{} starting on Minecraft {}", Branding.NAME, api.clientVersion(), api.minecraftVersion());
 
         Clicks.install(bus);
+        combat = new CombatTracker(bus);
+
+        // HUD
         modules.register(new FpsModule());
         modules.register(new CpsModule());
         modules.register(new KeystrokesModule());
         modules.register(new CoordinatesModule());
+        modules.register(new CombatHudModules.Ping());
+        modules.register(new CombatHudModules.Combo());
+        modules.register(new CombatHudModules.Reach());
+        modules.register(new CombatHudModules.Crits());
+        modules.register(new StatusHudModules.Armor());
+        modules.register(new StatusHudModules.Potions());
+        modules.register(new StatusHudModules.Cooldown());
+        modules.register(new StatusHudModules.Timers());
+        // Visual
         crosshair = modules.register(new CrosshairModule());
+        ZoomModule zoom = modules.register(new ZoomModule());
+        modules.register(new HitColorModule());
+        modules.register(new VisualModules.LowFire());
+        modules.register(new VisualModules.LowShield());
+        modules.register(new VisualModules.NoFog());
+        modules.register(new VisualModules.Particles());
+        modules.register(new VisualModules.Hitsounds());
+        // Gameplay
+        modules.register(new GameplayModules.ToggleSprint());
+        GameplayModules.HotbarBinds hotbar = modules.register(new GameplayModules.HotbarBinds());
+        modules.register(new GameplayModules.AutoMessages());
+        // Other
+        modules.register(new SafeServerModule(() -> modules, () -> combat.server(), store.root()));
+
+        zoom.bindKey(Platform.registerKey("key.cobalmoon.zoom", GLFW_KEY_C));
+        List<KeyMapping> slotKeys = new ArrayList<>();
+        for (GameplayModules.HotbarBinds.Kind k : GameplayModules.HotbarBinds.Kind.values()) {
+            slotKeys.add(Platform.registerKey(GameplayModules.HotbarBinds.keyName(k), GLFW_KEY_UNKNOWN));
+        }
+        hotbar.bindKeys(slotKeys);
 
         TitleBranding.register(api);
         Platform.registerHud(c -> {
@@ -79,6 +126,7 @@ public final class CobalmoonClient implements ClientModInitializer {
 
         KeyMapping editorKey = Platform.registerKey("key.cobalmoon.editor", GLFW_KEY_RIGHT_SHIFT);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            combat.tick(client);
             bus.post(Events.ClientTick.INSTANCE);
             while (editorKey.consumeClick()) {
                 if (!Platform.isScreenOpen()) openEditor();
@@ -102,6 +150,11 @@ public final class CobalmoonClient implements ClientModInitializer {
 
     public static void openEditor() {
         Platform.openEditor(new HudEditor(modules, settings, crosshair));
+    }
+
+    /** Combat event source; null before initialisation. */
+    public static CombatTracker combat() {
+        return combat;
     }
 
     public static boolean reduceMotion() {

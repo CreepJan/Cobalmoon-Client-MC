@@ -6,6 +6,7 @@ package dev.cobalmoon.core.compat;
 import dev.cobalmoon.core.editor.HudEditor;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -57,6 +58,11 @@ public final class EditorScreen extends Screen {
     public boolean keyPressed(KeyEvent e) {
         if (editor.keyPressed(e.key(), (e.modifiers() & SHIFT) != 0)) return true;
         return super.keyPressed(e);
+    }
+
+    @Override
+    public boolean charTyped(CharacterEvent e) {
+        return editor.charTyped(e.codepointAsString()) || super.charTyped(e);
     }
 
     @Override public void removed() { editor.close(); }

@@ -72,6 +72,12 @@ tasks.register('downloadCompatMods') {
     }
 }
 
+// `-PallModules`: start the game test with every module already enabled (as if saved), to catch modules
+// that use game state before Minecraft has finished starting.
+if (project.hasProperty('allModules')) {
+    loom.runs.named('clientGameTest') { property('cobalmoon.test.enableAllModules', 'true') }
+}
+
 if (project.hasProperty('compat')) {
     def paths = compatMods.collect { new File(compatDir, it.file as String).absolutePath }
     loom.runs.named('clientGameTest') {

@@ -31,6 +31,9 @@ public interface GuiCanvas extends HudCanvas {
      */
     void nextLayer();
 
+    /** Draws an item icon (16×16) at (x, y), like the hotbar does. */
+    void item(net.minecraft.world.item.ItemStack stack, int x, int y);
+
     /** Applies the current alpha multiplier to an ARGB colour. */
     static int mulAlpha(int argb, float alpha) {
         if (alpha >= 1f) return argb;

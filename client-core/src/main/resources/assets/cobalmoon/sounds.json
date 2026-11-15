@@ -1,0 +1,8 @@
+{
+  "hitsound.custom": {
+    "sounds": [
+      { "name": "minecraft:entity.arrow.hit_player", "type": "event" }
+    ],
+    "subtitle": "cobalmoon.subtitle.hitsound"
+  }
+}

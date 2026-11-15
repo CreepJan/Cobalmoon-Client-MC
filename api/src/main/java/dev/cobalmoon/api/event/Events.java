@@ -25,4 +25,33 @@ public final class Events {
         public static final int LEFT = 0;
         public static final int RIGHT = 1;
     }
+
+    /**
+     * The local player attacked an entity (the attack was sent; it may still miss or be cancelled
+     * by the server).
+     *
+     * @param entityId    network id of the target
+     * @param distance    distance from the player's eyes to the nearest point of the target's hitbox, in blocks
+     * @param critical    the attack met the vanilla critical-hit conditions
+     * @param targetIsPlayer whether the target is another player
+     */
+    public record Attack(int entityId, double distance, boolean critical, boolean targetIsPlayer) {}
+
+    /** The target of a recent {@link Attack} visibly took damage (its hurt animation started). */
+    public record HitConfirmed(int entityId, double distance, boolean critical, boolean targetIsPlayer) {}
+
+    /** The local player took damage. */
+    public record PlayerHurt(float healthAfter) {}
+
+    /** Joined a multiplayer server ({@code address} as typed, lower-case) or a singleplayer world ({@code null}). */
+    public record ServerJoin(String address) {}
+
+    /** Left the current world or server. */
+    public static final class ServerLeave {
+        public static final ServerLeave INSTANCE = new ServerLeave();
+        private ServerLeave() {}
+    }
+
+    /** A chat or system message was shown, as plain text without formatting. */
+    public record ChatMessage(String text) {}
 }

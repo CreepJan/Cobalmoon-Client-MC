@@ -1,0 +1,4 @@
+{
+  "$comment": "Community guide for the optional Safe Server Mode. Each entry lists Cobalmoon module ids a server is known to restrict, with a short reason and a link to the server's own rules. It only produces a notice; nothing is ever blocked. Add entries only with a public source. See docs/safe-server-mode.md.",
+  "servers": []
+}

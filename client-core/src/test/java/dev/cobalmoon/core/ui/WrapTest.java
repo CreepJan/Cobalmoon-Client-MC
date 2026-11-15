@@ -23,6 +23,7 @@ class WrapTest {
         @Override public void clip(int a, int b, int c, int d) {}
         @Override public void endClip() {}
         @Override public void nextLayer() {}
+        @Override public void item(net.minecraft.world.item.ItemStack s, int x, int y) {}
     }
 
     @Test

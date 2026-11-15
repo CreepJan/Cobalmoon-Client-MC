@@ -100,6 +100,42 @@ class ModuleTest {
         assertEquals(1, errors.size());
     }
 
+    /** A module whose onEnable fails (e.g. game not ready yet). */
+    static final class Broken extends Module {
+        int ticks;
+        Broken() {
+            super("test:broken", "Broken", "Throws on enable", Category.OTHER);
+            on(Events.ClientTick.class, e -> ticks++);
+        }
+        @Override protected void onEnable() { throw new NullPointerException("options is null"); }
+        @Override protected void onDisable() { throw new IllegalStateException("also broken"); }
+    }
+
+    @Test
+    void failingModulesNeverCrashAndTurnThemselvesOff() {
+        List<String> reported = new ArrayList<>();
+        Module.setErrorHandler((m, t) -> reported.add(m.id() + ": " + t.getMessage()));
+        try {
+            EventBus bus = new EventBus((e, t) -> fail(t));
+            // Saved as enabled, activated during startup (the crash reported by a player).
+            Broken atStartup = new Broken();
+            atStartup.setEnabled(true);
+            assertDoesNotThrow(() -> atStartup.bind(bus));
+            assertFalse(atStartup.isEnabled(), "turned back off");
+            bus.post(Events.ClientTick.INSTANCE);
+            assertEquals(0, atStartup.ticks, "its handlers were removed");
+
+            // Toggled from the menu.
+            Broken fromMenu = new Broken();
+            fromMenu.bind(bus);
+            assertDoesNotThrow(() -> fromMenu.setEnabled(true));
+            assertFalse(fromMenu.isEnabled());
+            assertEquals(List.of("test:broken: options is null", "test:broken: options is null"), reported);
+        } finally {
+            Module.setErrorHandler((m, t) -> t.printStackTrace());
+        }
+    }
+
     @Test
     void idsAreValidated() {
         assertThrows(IllegalArgumentException.class, () -> new Module("Bad Id", "x", "x", Category.OTHER) {});

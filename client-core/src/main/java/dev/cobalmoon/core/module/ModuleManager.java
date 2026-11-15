@@ -71,6 +71,8 @@ public final class ModuleManager implements ModuleRegistry {
             }
         }
         boolean enabled = saved.get("enabled") instanceof Boolean b ? b : module.enabledByDefault();
+        // Test hook: start with every module on, as if saved that way (catches modules that touch the game too early).
+        if (Boolean.getBoolean("cobalmoon.test.enableAllModules")) enabled = true;
         module.setEnabled(enabled);
     }
 
@@ -78,7 +80,10 @@ public final class ModuleManager implements ModuleRegistry {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("enabled", module.isEnabled());
         Map<String, Object> settings = new LinkedHashMap<>();
-        for (Setting<?> s : module.settings()) settings.put(s.key(), s.toJson());
+        for (Setting<?> s : module.settings()) {
+            Object json = s.toJson();
+            if (json != null) settings.put(s.key(), json);
+        }
         out.put("settings", settings);
         if (!module.hudElements().isEmpty()) {
             Map<String, Object> hud = new LinkedHashMap<>();

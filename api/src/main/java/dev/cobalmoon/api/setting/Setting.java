@@ -51,6 +51,13 @@ public abstract class Setting<T> {
 
     public final void reset() { set(defaultValue); }
 
+    private boolean hidden;
+
+    /** Hidden settings are saved but not shown in the menu (internal state such as lists). */
+    public final boolean isHidden() { return hidden; }
+
+    public final void setHidden(boolean hidden) { this.hidden = hidden; }
+
     /** Called with the new value whenever it changes. */
     public final void onChange(Consumer<T> listener) { listeners.add(listener); }
 

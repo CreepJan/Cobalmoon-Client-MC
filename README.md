@@ -8,7 +8,15 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 > Cobalmoon Client no está afiliado a Mojang ni a Microsoft. «Minecraft» es una marca de Mojang Synergies AB.
 > El launcher descarga el juego de los servidores oficiales de Mojang; no redistribuimos su código ni sus assets.
 
-## Estado: Fase 3 (beta en curso)
+## Estado: Fase 4 (beta en curso)
+
+**Fase 4: módulos PvP completos** ([detalles](docs/pvp-modules.md)):
+- **HUD:** ping, combo, reach, críticos, armadura, efectos, cooldown y temporizadores.
+- **Visual:** zoom (`C`), color de golpe, fuego y escudo bajos, sin niebla, partículas y hitsounds.
+- **Juego:** toggle sprint, atajos de hotbar y mensajes automáticos.
+- **[Modo Servidor Seguro](docs/safe-server-mode.md):** opcional, desactivado por defecto y nunca bloquea nada.
+
+### Fase 3
 
 **Fase 3:** importar instalaciones existentes y compatibilidad con mods ([detalles](docs/compatibility.md)):
 - Detecta e importa el launcher oficial, Prism/MultiMC, CurseForge, Modrinth App, cualquier carpeta y `.mrpack`, en su sitio (sin tocar sus mods) o como copia.
@@ -21,7 +29,7 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 
 | Funciona | Falta (próximas fases) |
 |---|---|
-| **Módulos** activables en caliente, con ajustes que se guardan solos (`config/cobalmoon/`) | Resto de módulos PvP y Modo Servidor Seguro — fase 4 |
+| **Módulos** activables en caliente, con ajustes que se guardan solos (`config/cobalmoon/`) | ✅ Hecho en la fase 4 |
 | **5 módulos:** FPS, CPS, Keystrokes, Coordenadas, Crosshair personalizable | |
 | **Editor de HUD** (`Shift derecho`): arrastrar con imán, rueda para escalar, multiselección, flechas, opacidad, colores, fondo y sombra por elemento | Perfiles de HUD compartibles por código — fase 5 |
 | Interfaz in-game con la paleta Cobalmoon y opción de reducir animaciones | Editor de temas — fase 6 |
@@ -35,10 +43,11 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 |---|---|
 | Abrir / cerrar | `Shift derecho` / `Esc` (configurable en Controles) |
 | Mover | Arrastrar (se imanta a bordes, centro y otros elementos) · flechas: 1 px, `Shift`+flechas: 10 px |
-| Escalar | Rueda del ratón sobre el elemento |
+| Escalar | Arrastrar el tirador turquesa de la esquina, o rueda del ratón sobre el elemento |
 | Varios a la vez | `Shift`+clic |
 | Restablecer | `R` o botón *Restablecer* |
-| Ocultar paneles | `Tab` (para alcanzar elementos debajo) |
+| Vista limpia (solo el HUD) | Botón «Editar HUD» arriba (o `Tab`); «Volver a ajustes» para regresar |
+| Cambiar un color | Clic en la fila de color → rueda de color con brillo, transparencia y paleta (clic derecho: siguiente color de la paleta) |
 | Activar módulos y ajustes | Panel izquierdo (interruptor) y panel derecho |
 
 Arquitectura y plan completo: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -125,7 +134,7 @@ Cualquier mod de Fabric puede añadir módulos declarando el entrypoint `cobalmo
 ## Filosofía
 
 El cliente no bloquea ni censura lo que instales. No incluye cheats ni nada para evadir anticheats. El «Modo
-Servidor Seguro» (fase 4) solo avisa y viene desactivado. Sin telemetría.
+Servidor Seguro» solo avisa y viene desactivado. Sin telemetría.
 
 ## Licencia
 

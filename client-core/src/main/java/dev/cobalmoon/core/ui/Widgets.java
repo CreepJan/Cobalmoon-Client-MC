@@ -3,7 +3,9 @@
  */
 package dev.cobalmoon.core.ui;
 
+import dev.cobalmoon.api.setting.ActionSetting;
 import dev.cobalmoon.api.setting.BooleanSetting;
+import dev.cobalmoon.api.setting.StringSetting;
 import dev.cobalmoon.api.setting.ColorSetting;
 import dev.cobalmoon.api.setting.EnumSetting;
 import dev.cobalmoon.api.setting.NumberSetting;
@@ -236,7 +238,18 @@ public final class Widgets {
         }
     }
 
-    /** Colour from the preset swatches: click/right-click cycles, mouse wheel changes alpha. */
+    /** Opens the colour picker for a row; set by the screen that hosts the panels. */
+    public interface PickerOpener {
+        void open(String title, IntSupplier get, IntConsumer set, int rowY);
+    }
+
+    private static PickerOpener pickerOpener;
+
+    public static void setPickerOpener(PickerOpener opener) {
+        pickerOpener = opener;
+    }
+
+    /** Colour row: click opens the colour wheel, right click cycles the palette, mouse wheel changes alpha. */
     public static final class ColorPick extends Row {
         private final Supplier<String> label;
         private final IntSupplier get;
@@ -284,11 +297,15 @@ public final class Widgets {
 
         @Override
         boolean click(int x, int y, int w, double mx, double my, int button) {
+            if (button == 0 && pickerOpener != null) {
+                pickerOpener.open(label.get(), get, set, y);
+                return true;
+            }
             int argb = get.getAsInt();
             int rgb = argb & 0xFFFFFF;
             int idx = -1;
             for (int i = 0; i < Theme.SWATCHES.length; i++) if ((Theme.SWATCHES[i] & 0xFFFFFF) == rgb) idx = i;
-            int next = Math.floorMod(idx + (button == 1 ? -1 : 1), Theme.SWATCHES.length);
+            int next = Math.floorMod(idx + 1, Theme.SWATCHES.length);
             set.accept((argb & 0xFF000000) | (Theme.SWATCHES[next] & 0xFFFFFF));
             return true;
         }
@@ -354,16 +371,23 @@ public final class Widgets {
             this.selected = selected;
         }
 
+        private List<String> lines = List.of();
+
         @Override int preferredWidth(GuiCanvas c) { return c.textWidth(name.get()) + 50; }
+
+        @Override void layout(GuiCanvas c, int w) { lines = wrap(c, name.get(), w - 44); }
+
+        @Override protected int height() { return wrappedHeight(lines); }
 
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
             boolean sel = selected.getAsBoolean();
-            if (sel) c.fill(x, y, x + w, y + ROW_H, Theme.hover());
-            else if (hovered) c.fill(x, y, x + w, y + ROW_H, Theme.withAlpha(Theme.hover(), 0x99));
-            if (sel) c.fill(x, y, x + 2, y + ROW_H, Theme.accent());
-            c.text(ellipsize(c, name.get(), w - 44), x + 8, y + 5, enabled.getAsBoolean() ? Theme.text() : Theme.muted(), false);
-            drawSwitch(c, x + w - 28, y + 4, enabled.getAsBoolean());
+            int h = height();
+            if (sel) c.fill(x, y, x + w, y + h, Theme.hover());
+            else if (hovered) c.fill(x, y, x + w, y + h, Theme.withAlpha(Theme.hover(), 0x99));
+            if (sel) c.fill(x, y, x + 2, y + h, Theme.accent());
+            drawLines(c, lines, x + 8, y, h, enabled.getAsBoolean() ? Theme.text() : Theme.muted());
+            drawSwitch(c, x + w - 28, y + (h - 10) / 2, enabled.getAsBoolean());
         }
 
         @Override
@@ -402,9 +426,77 @@ public final class Widgets {
         return s.substring(0, end) + dots;
     }
 
+    /** Single-line text input. One field is focused at a time; the screen forwards typed characters. */
+    public static final class TextField extends Row {
+        private static TextField focused;
+        private final Supplier<String> label;
+        private final StringSetting setting;
+
+        public TextField(StringSetting setting) {
+            this.label = () -> Tr.of(setting.name());
+            this.setting = setting;
+        }
+
+        @Override protected int height() { return 32; }
+
+        @Override int preferredWidth(GuiCanvas c) { return Math.max(120, c.textWidth(label.get()) + 16); }
+
+        @Override
+        void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
+            boolean f = focused == this;
+            c.text(ellipsize(c, label.get(), w - 12), x + 6, y + 3, Theme.text(), false);
+            int bx1 = x + 6, bx2 = x + w - 6, by1 = y + 14, by2 = y + 29;
+            c.fill(bx1, by1, bx2, by2, Theme.panelSunken());
+            c.outline(bx1, by1, bx2 - bx1, by2 - by1, f ? Theme.accent() : Theme.border());
+            String text = setting.get();
+            int max = bx2 - bx1 - 8;
+            // Show the end of long text so the caret stays visible.
+            while (c.textWidth(text) > max && !text.isEmpty()) text = text.substring(1);
+            c.text(text, bx1 + 4, by1 + 4, Theme.text(), false);
+            if (f && (System.currentTimeMillis() / 500) % 2 == 0) {
+                int cx = bx1 + 4 + c.textWidth(text);
+                c.fill(cx, by1 + 3, cx + 1, by2 - 3, Theme.accent());
+            }
+        }
+
+        @Override
+        boolean click(int x, int y, int w, double mx, double my, int button) {
+            focused = this;
+            if (button == 1) setting.set(""); // right click clears
+            return true;
+        }
+
+        public static boolean isFocused() { return focused != null; }
+
+        public static void blur() { focused = null; }
+
+        /** Typed text for the focused field. */
+        public static boolean type(String s) {
+            if (focused == null) return false;
+            focused.setting.set(focused.setting.get() + s);
+            return true;
+        }
+
+        /** Editing keys (GLFW codes): backspace deletes, enter/escape finish. */
+        public static boolean key(int key) {
+            if (focused == null) return false;
+            switch (key) {
+                case 259 -> {
+                    String v = focused.setting.get();
+                    if (!v.isEmpty()) focused.setting.set(v.substring(0, v.offsetByCodePoints(v.length(), -1)));
+                }
+                case 257, 335, 256 -> focused = null;
+                default -> { }
+            }
+            return true;
+        }
+    }
+
     /** Builds the right row for a setting type; unknown types become a read-only label. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Row forSetting(Setting<?> s) {
+        if (s instanceof ActionSetting a) return new Button(() -> Tr.of(a.name()), a::run, false);
+        if (s instanceof StringSetting str) return new TextField(str);
         if (s instanceof BooleanSetting b) return Toggle.of(b);
         if (s instanceof NumberSetting n) return Slider.of(n);
         if (s instanceof ColorSetting col) return ColorPick.of(col);

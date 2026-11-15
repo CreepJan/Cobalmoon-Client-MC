@@ -17,3 +17,7 @@ launcher/src-tauri/resources/mods/*.jar
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs written by test/dev runs
+logs/
+*.log

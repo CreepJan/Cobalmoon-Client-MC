@@ -88,6 +88,17 @@ class SettingsTest {
     }
 
     @Test
+    void stringsAreCleanedAndCut() {
+        StringSetting s = new StringSetting("msg", "Message", "gg", 10);
+        s.set("hola\nmundo\u0007");
+        assertEquals("holamundo", s.get());
+        s.set("0123456789ABC");
+        assertEquals("0123456789", s.get());
+        s.fromJson(42);
+        assertEquals("gg", s.get());
+    }
+
+    @Test
     void keysAreValidated() {
         assertThrows(IllegalArgumentException.class, () -> new BooleanSetting("Bad Key", "x", true));
     }
