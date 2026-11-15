@@ -42,19 +42,11 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
             dev.cobalmoon.core.CobalmoonClient.LOG.info("Compatibility test running alongside: {}", loaded);
         }
 
-        // CI machines render in software (no GPU) and Fabric waits at most one minute for the world to load.
-        // Render distance 2 (25 chunks instead of 121), and 10 FPS while the world loads, keep the software
-        // renderer from taking every CPU core away from the integrated server that generates the world.
-        // The frame limit is restored afterwards: input checks (CPS training) need normal frame rates.
-        int fpsLimit = ctx.computeOnClient(mc -> {
-            mc.options.renderDistance().set(2);
-            int previous = mc.options.framerateLimit().get();
-            mc.options.framerateLimit().set(10);
-            return previous;
-        });
+        // CI machines render in software (no GPU) and Fabric gives the world 1200 ticks to load. Render
+        // distance 2 (25 chunks instead of 121) is plenty for these checks and makes that limit easier to meet.
+        ctx.runOnClient(mc -> mc.options.renderDistance().set(2));
 
         try (TestSingleplayerContext world = ctx.worldBuilder().create()) {
-            ctx.runOnClient(mc -> mc.options.framerateLimit().set(fpsLimit));
             ctx.waitTicks(40);
             if (System.getProperty("cobalmoon.compat") != null) {
                 ctx.takeScreenshot("cobalmoon-compat-world");

@@ -80,10 +80,14 @@ jobs:
           # SDL3 name first; the SDL2 name is kept for older builds.
           SDL_VIDEO_FORCE_EGL: "1"
           SDL_VIDEO_X11_FORCE_EGL: "1"
-          # Mesa's software renderer uses every core by default and starved the integrated server
-          # ("Can't keep up!", "Timeout loading world"); leave CPU for world generation.
-          LP_NUM_THREADS: "2"
-        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :client-core:mc-${{ matrix.mc }}:runClientGameTest ${{ matrix.mods }}
+        # On these GPU-less runners 1.21.11 sometimes needs more than Fabric's 1200 ticks to load the test
+        # world ("Timeout loading world"); it passes reliably on real hardware. Retry once before failing.
+        run: |
+          task=":client-core:mc-${{ matrix.mc }}:runClientGameTest ${{ matrix.mods }}"
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew $task || {
+            echo "::warning::Game test failed on the first attempt; retrying once."
+            xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew $task
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
