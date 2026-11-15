@@ -1,0 +1,15 @@
+// Root build: shared conventions for every Java project.
+// Reproducible archives: fixed file order, no timestamps.
+subprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
+
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}

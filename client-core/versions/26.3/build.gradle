@@ -1,0 +1,16 @@
+// Cobalmoon core for Minecraft 26.3 (unobfuscated: no remapping, Mojang names).
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+ext.javaVersion = 25
+apply from: rootProject.file('client-core/common.gradle')
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    implementation project(':api')
+    include project(':api')
+}

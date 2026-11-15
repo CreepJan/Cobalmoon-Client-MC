@@ -1,0 +1,18 @@
+// Cobalmoon core for Minecraft 1.21.11 (obfuscated: remapped with Mojang's official mappings,
+// so the shared sources use the same names as the 26.x build).
+plugins {
+    id 'net.fabricmc.fabric-loom-remap'
+}
+
+ext.javaVersion = 21
+apply from: rootProject.file('client-core/common.gradle')
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    implementation project(':api')
+    include project(':api')
+}

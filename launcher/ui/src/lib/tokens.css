@@ -1,0 +1,34 @@
+/* Generated from design-tokens/tokens.json by design-tokens/scripts/build.mjs. Do not edit by hand. */
+:root {
+  --cm-color-night: #10182C;
+  --cm-color-lunar: #7486B8;
+  --cm-color-accent: #52E0D0;
+  --cm-color-stone: #E9EDF2;
+  --cm-color-night-sunken: #0B1120;
+  --cm-color-night-raised: #141D35;
+  --cm-color-night-overlay: #222E4F;
+  --cm-color-accent-strong: #7FF0E3;
+  --cm-color-on-accent: #10182C;
+  --cm-color-danger: #FF7A88;
+  --cm-color-warning: #FFC86B;
+  --cm-radius-sm: 4px;
+  --cm-radius-md: 8px;
+  --cm-radius-lg: 14px;
+  --cm-space-xs: 4px;
+  --cm-space-sm: 8px;
+  --cm-space-md: 16px;
+  --cm-space-lg: 24px;
+  --cm-space-xl: 40px;
+  --cm-motion-fast: 120ms;
+  --cm-motion-normal: 220ms;
+  --cm-motion-slow: 380ms;
+  --cm-motion-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  --cm-font-ui: "Inter", "Segoe UI", system-ui, sans-serif;
+  --cm-font-mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, monospace;
+}
+
+/* Reduced motion: honour the OS setting; the launcher can also force it with [data-reduce-motion]. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --cm-motion-fast: 0ms; --cm-motion-normal: 0ms; --cm-motion-slow: 0ms; }
+}
+:root[data-reduce-motion] { --cm-motion-fast: 0ms; --cm-motion-normal: 0ms; --cm-motion-slow: 0ms; }

@@ -1,0 +1,43 @@
+// Cobalmoon public API — LGPL-3.0-or-later.
+// Pure Java, no Minecraft dependency, so third-party modules can compile against it for any game version.
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+base { archivesName = 'cobalmoon-api' }
+
+repositories { mavenCentral() }
+
+java {
+    // Lowest Java among supported game versions (1.21.11 -> Java 21).
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+dependencies {
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test { useJUnitPlatform() }
+
+javadoc {
+    options.encoding = 'UTF-8'
+    (options as StandardJavadocDocletOptions).addBooleanOption('Xdoclint:none', true)
+}
+
+jar {
+    from(rootProject.file('api/LICENSE')) { rename { 'LICENSE_cobalmoon-api' } }
+}
+
+publishing {
+    publications {
+        create('mavenJava', MavenPublication) {
+            artifactId = 'cobalmoon-api'
+            from components.java
+        }
+    }
+}

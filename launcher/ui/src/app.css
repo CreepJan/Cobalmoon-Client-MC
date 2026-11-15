@@ -1,0 +1,125 @@
+/* Global launcher styles. All colours come from tokens.css (generated from design-tokens/tokens.json). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--cm-color-night);
+  color: var(--cm-color-stone);
+  font-family: var(--cm-font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cm-color-accent);
+  outline-offset: 2px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cm-space-sm);
+  border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 45%, transparent);
+  background: var(--cm-color-night-raised);
+  color: var(--cm-color-stone);
+  border-radius: var(--cm-radius-md);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background var(--cm-motion-fast) var(--cm-motion-easing), border-color var(--cm-motion-fast) var(--cm-motion-easing),
+    transform var(--cm-motion-fast) var(--cm-motion-easing);
+}
+.btn:hover:not(:disabled) {
+  background: var(--cm-color-night-overlay);
+  border-color: var(--cm-color-lunar);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Text on the accent is always on-accent (night): stone on turquoise fails WCAG. */
+.btn.primary {
+  background: var(--cm-color-accent);
+  border-color: var(--cm-color-accent);
+  color: var(--cm-color-on-accent);
+  font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--cm-color-accent-strong);
+  border-color: var(--cm-color-accent-strong);
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--cm-color-lunar);
+}
+.btn.ghost:hover:not(:disabled) {
+  color: var(--cm-color-stone);
+  background: var(--cm-color-night-raised);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+.field > span {
+  color: var(--cm-color-lunar);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.field input,
+.field select {
+  background: var(--cm-color-night-sunken);
+  border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 45%, transparent);
+  border-radius: var(--cm-radius-md);
+  padding: 8px 10px;
+  user-select: text;
+}
+.field input:focus,
+.field select:focus {
+  border-color: var(--cm-color-accent);
+  outline: none;
+}
+.hint {
+  color: var(--cm-color-lunar);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--cm-color-lunar);
+}
+
+@keyframes cm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

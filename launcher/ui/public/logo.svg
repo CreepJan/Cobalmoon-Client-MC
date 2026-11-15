@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Cobalmoon Client logo: cobalt crescent with a turquoise rim on a night-blue tile. Original artwork, GPL-3.0-or-later. -->
+  <defs>
+    <linearGradient id="cobalt" x1="0.15" y1="0.1" x2="0.85" y2="0.95">
+      <stop offset="0" stop-color="#9AAAD8"/>
+      <stop offset="0.55" stop-color="#4B63B0"/>
+      <stop offset="1" stop-color="#22357A"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7FF0E3"/>
+      <stop offset="1" stop-color="#52E0D0"/>
+    </linearGradient>
+    <mask id="crescent">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="640" cy="400" r="300" fill="#000"/>
+    </mask>
+    <mask id="crescent-rim">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="616" cy="424" r="300" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="#10182C"/>
+  <!-- turquoise rim: slightly larger crescent behind the cobalt one -->
+  <circle cx="490" cy="540" r="352" fill="url(#rim)" mask="url(#crescent-rim)"/>
+  <circle cx="490" cy="540" r="330" fill="url(#cobalt)" mask="url(#crescent)"/>
+  <!-- star -->
+  <path d="M760 210 L782 270 L842 292 L782 314 L760 374 L738 314 L678 292 L738 270 Z" fill="#E9EDF2"/>
+</svg>

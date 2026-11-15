@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "cobalmoon",
+  "version": "${version}",
+  "name": "Cobalmoon Client",
+  "description": "Free and open-source PvP client for Minecraft: performance, HUD and fully customizable tools. Not affiliated with Mojang or Microsoft.",
+  "authors": ["Cobalmoon contributors"],
+  "contact": {
+    "sources": "https://github.com/cobalmoon/cobalmoon-client",
+    "issues": "https://github.com/cobalmoon/cobalmoon-client/issues"
+  },
+  "license": "GPL-3.0-or-later",
+  "icon": "assets/cobalmoon/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.cobalmoon.core.CobalmoonClient"]
+  },
+  "mixins": ["cobalmoon.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_dep}",
+    "java": ">=${java_version}",
+    "fabric-api-base": "*",
+    "fabric-screen-api-v1": "*",
+    "fabric-resource-loader-v1": "*",
+    "fabric-rendering-v1": "*",
+    "fabric-lifecycle-events-v1": "*",
+    "${key_module}": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "links": { "modmenu.discord": "https://github.com/cobalmoon/cobalmoon-client" }
+    }
+  }
+}

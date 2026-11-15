@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  design-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: WCAG contrast
+        run: node design-tokens/scripts/check-contrast.mjs
+      - name: Token unit tests
+        run: node --test design-tokens/scripts/
+      - name: Generated files are up to date
+        run: node design-tokens/scripts/build.mjs --check
+
+  mod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # 21 for the 1.21.11 build and the API, 25 (last = default) runs Gradle and the 26.x build.
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: true
+      - name: Build and test (API + core for every Minecraft version)
+        run: ./gradlew build --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cobalmoon-core
+          path: |
+            client-core/versions/*/build/libs/cobalmoon-core-*.jar
+            api/build/libs/cobalmoon-api-*.jar
+
+  client-gametest:
+    # Starts the real game (software rendering under Xvfb), creates a world, drives the modules and
+    # the HUD editor, and uploads the screenshots.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ["26.3", "1.21.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Xvfb and Mesa
+        run: sudo apt-get update && sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri
+      - name: Client game test
+        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :client-core:mc-${{ matrix.mc }}:runClientGameTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gametest-screenshots-${{ matrix.mc }}
+          path: client-core/versions/${{ matrix.mc }}/build/run/clientGameTest/screenshots/
+
+  launcher:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: launcher
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: launcher/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher/src-tauri
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: Rust tests
+        working-directory: launcher/src-tauri
+        run: cargo test --locked

@@ -1,0 +1,30 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    plugins {
+        // Both ids come from the same Loom artifact.
+        // 26.x is unobfuscated -> "fabric-loom" (no remapping).
+        // 1.21.11 and older are obfuscated -> "fabric-loom-remap" with Mojang's official mappings.
+        id 'net.fabricmc.fabric-loom' version "${loom_version}"
+        id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+    }
+}
+
+rootProject.name = 'cobalmoon'
+
+include 'api'
+
+// One Gradle project per supported Minecraft version. All of them compile the shared
+// sources in client-core/src plus their own client-core/versions/<mc>/src.
+def mcVersions = ['26.3', '1.21.11']
+mcVersions.each { mc ->
+    def path = ":client-core:mc-${mc}"
+    include path
+    project(path).projectDir = file("client-core/versions/${mc}")
+}

@@ -1,0 +1,87 @@
+// Shared configuration for every client-core/versions/<mc> project.
+// The version project applies the right Loom plugin first, sets `ext.javaVersion`, then applies this file.
+
+def coreDir = rootProject.file('client-core')
+
+base { archivesName = "cobalmoon-core-mc${project.minecraft_version}" }
+
+sourceSets {
+    main {
+        java.srcDirs = [new File(coreDir, 'src/main/java'), 'src/main/java']
+        resources.srcDirs = [new File(coreDir, 'src/main/resources'), 'src/main/resources']
+    }
+    test {
+        java.srcDirs = [new File(coreDir, 'src/test/java')]
+    }
+}
+
+// Client game tests: start the real game, create a world, drive the modules and the HUD editor,
+// and save screenshots. Run with `gradlew :client-core:mc-<version>:runClientGameTest`.
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'cobalmoon-gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
+sourceSets {
+    gametest {
+        java.srcDirs = [new File(coreDir, 'src/gametest/java')]
+        resources.srcDirs = [new File(coreDir, 'src/gametest/resources')]
+    }
+}
+
+loom {
+    mods {
+        cobalmoon { sourceSet sourceSets.main }
+    }
+    runs {
+        client {
+            // Keep each version's dev game directory separate.
+            runDir = "../../../run/${project.minecraft_version}"
+        }
+    }
+}
+
+// Fabric API modules the core needs, bundled jar-in-jar so a clean instance works without
+// installing Fabric API. If the player also has Fabric API, Fabric Loader keeps the newest copy.
+def bundledFabricModules = ['fabric-api-base', 'fabric-screen-api-v1', 'fabric-resource-loader-v1',
+                            'fabric-rendering-v1', 'fabric-lifecycle-events-v1', project.fabric_key_module]
+
+dependencies {
+    bundledFabricModules.each { include fabricApi.module(it, project.fabric_api_version) }
+
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test { useJUnitPlatform() }
+
+processResources {
+    def props = [
+        version          : project.version,
+        minecraft_dep    : project.minecraft_dep,
+        java_version     : project.ext.javaVersion.toString(),
+        loader_version   : project.loader_version,
+        key_module       : project.fabric_key_module,
+    ]
+    inputs.properties props
+    filesMatching('fabric.mod.json') { expand props }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = project.ext.javaVersion
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(project.ext.javaVersion) }
+    withSourcesJar()
+}
+
+jar {
+    from(rootProject.file('LICENSE')) { rename { 'LICENSE_cobalmoon' } }
+}
