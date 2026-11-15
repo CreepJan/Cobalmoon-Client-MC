@@ -34,6 +34,53 @@ sourceSets {
     }
 }
 
+// ---- Compatibility test -------------------------------------------------------------------
+// `gradlew :client-core:mc-<v>:runClientGameTest -Pcompat` runs the same game test with the
+// third-party mods pinned in tests/compat/mods-<v>.json (downloaded and SHA-512 verified).
+def compatList = rootProject.file("tests/compat/mods-${project.minecraft_version}.json")
+def compatDir = layout.buildDirectory.dir('compat-mods').get().asFile
+// Read through `providers` so the configuration cache is invalidated when the pinned list changes.
+def compatJson = providers.fileContents(rootProject.layout.projectDirectory.file("tests/compat/mods-${project.minecraft_version}.json")).asText
+def compatMods = compatJson.isPresent() ? new groovy.json.JsonSlurper().parseText(compatJson.get()).mods : []
+
+tasks.register('downloadCompatMods') {
+    description = 'Downloads and verifies the third-party mods used by the compatibility test.'
+    def mods = compatMods.collect { [file: it.file as String, url: it.url as String, sha512: it.sha512 as String] }
+    def dir = compatDir
+    inputs.file(compatList)
+    outputs.dir(dir)
+    doLast {
+        dir.mkdirs()
+        def sha512 = { File f ->
+            def md = java.security.MessageDigest.getInstance('SHA-512')
+            f.withInputStream { s -> byte[] buf = new byte[65536]; int n; while ((n = s.read(buf)) > 0) md.update(buf, 0, n) }
+            md.digest().encodeHex().toString()
+        }
+        mods.each { m ->
+            def target = new File(dir, m.file)
+            if (target.exists() && sha512(target) == m.sha512) return
+            def conn = new URL(m.url).openConnection()
+            conn.setRequestProperty('User-Agent', 'cobalmoon-compat-test/1.0 (open-source Minecraft PvP client)')
+            conn.inputStream.withStream { input -> target.withOutputStream { it << input } }
+            def actual = sha512(target)
+            if (actual != m.sha512) {
+                target.delete()
+                throw new GradleException("SHA-512 mismatch for ${m.file}: expected ${m.sha512}, got ${actual}")
+            }
+            logger.lifecycle("compat: ${m.file} verified")
+        }
+    }
+}
+
+if (project.hasProperty('compat')) {
+    def paths = compatMods.collect { new File(compatDir, it.file as String).absolutePath }
+    loom.runs.named('clientGameTest') {
+        property('fabric.addMods', paths.join(File.pathSeparator))
+        property('cobalmoon.compat', 'true')
+    }
+    tasks.named('runClientGameTest') { dependsOn 'downloadCompatMods' }
+}
+
 loom {
     mods {
         cobalmoon { sourceSet sourceSets.main }
@@ -66,7 +113,7 @@ processResources {
         version          : project.version,
         minecraft_dep    : project.minecraft_dep,
         java_version     : project.ext.javaVersion.toString(),
-        loader_version   : project.loader_version,
+        loader_version   : project.min_loader_version,
         key_module       : project.fabric_key_module,
     ]
     inputs.properties props

@@ -226,11 +226,11 @@ pub fn library_downloads(v: &VersionJson, libraries_dir: &Path, env: &Env) -> Re
                 Some(p) => p.clone(),
                 None => maven_path(&lib.name)?,
             };
-            out.push(Download { url: a.url.clone(), path: libraries_dir.join(rel), sha1: Some(a.sha1.clone()), size: Some(a.size) });
+            out.push(Download { url: a.url.clone(), path: libraries_dir.join(rel), sha1: Some(a.sha1.clone()), size: Some(a.size), ..Default::default() });
         } else if let Some(base) = &lib.url {
             let rel = maven_path(&lib.name)?;
             let url = format!("{}/{}", base.trim_end_matches('/'), rel);
-            out.push(Download { url, path: libraries_dir.join(rel), sha1: lib.sha1.clone(), size: lib.size });
+            out.push(Download { url, path: libraries_dir.join(rel), sha1: lib.sha1.clone(), size: lib.size, ..Default::default() });
         }
         // Libraries with neither (e.g. legacy natives-only entries) are skipped.
     }
@@ -272,6 +272,7 @@ pub fn asset_downloads(index: &AssetIndex, assets_dir: &Path) -> Vec<Download> {
                 path: assets_dir.join("objects").join(prefix).join(&o.hash),
                 sha1: Some(o.hash.clone()),
                 size: Some(o.size),
+                ..Default::default()
             }
         })
         .collect()

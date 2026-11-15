@@ -8,7 +8,14 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 > Cobalmoon Client no está afiliado a Mojang ni a Microsoft. «Minecraft» es una marca de Mojang Synergies AB.
 > El launcher descarga el juego de los servidores oficiales de Mojang; no redistribuimos su código ni sus assets.
 
-## Estado: Fase 2 (MVP)
+## Estado: Fase 3 (beta en curso)
+
+**Fase 3:** importar instalaciones existentes y compatibilidad con mods ([detalles](docs/compatibility.md)):
+- Detecta e importa el launcher oficial, Prism/MultiMC, CurseForge, Modrinth App, cualquier carpeta y `.mrpack`, en su sitio (sin tocar sus mods) o como copia.
+- Añade cualquier `.jar`, busca e instala mods de Modrinth con dependencias, y trae un preset PvP de rendimiento.
+- Probado en el juego real junto a Sodium, Iris, Lithium, Mod Menu, ReplayMod y Xaero's Minimap, y con un modpack real de 60 mods.
+
+### Fase 2
 
 <p align="center"><img src="docs/img/phase2-hud-26.3.png" width="48%" alt="HUD"> <img src="docs/img/phase2-editor-26.3.png" width="48%" alt="Editor de HUD"></p>
 
@@ -19,7 +26,7 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 | **Editor de HUD** (`Shift derecho`): arrastrar con imán, rueda para escalar, multiselección, flechas, opacidad, colores, fondo y sombra por elemento | Perfiles de HUD compartibles por código — fase 5 |
 | Interfaz in-game con la paleta Cobalmoon y opción de reducir animaciones | Editor de temas — fase 6 |
 | API pública de módulos para addons ([guía](docs/modules.md)) | Scripts Lua — fase 6 |
-| Launcher Tauri: perfiles, login Microsoft (OAuth + PKCE), descargas verificadas de Mojang/Fabric | Login real: client ID de Azure aprobado ([guía](docs/azure-app.md)); importar instalaciones y Modrinth — fase 3 |
+| Launcher Tauri: perfiles, login Microsoft (OAuth + PKCE), descargas verificadas de Mojang/Fabric | Login real: client ID de Azure aprobado ([guía](docs/azure-app.md)) |
 | Mod núcleo para **26.3** y **1.21.11** | 1.8.9 — después de v1.0 |
 
 ### Atajos del editor de HUD
@@ -81,6 +88,20 @@ Prueba en el juego real (crea un mundo, usa los módulos y el editor y guarda ca
 ```bash
 ./gradlew :client-core:mc-26.3:runClientGameTest
 ```
+
+La misma prueba junto a Sodium, Iris, Lithium, Mod Menu, ReplayMod y Xaero's Minimap (versiones fijadas con SHA-512):
+
+```bash
+./gradlew :client-core:mc-26.3:runClientGameTest -Pcompat
+```
+
+Comprobaciones con datos reales: detecta tus instalaciones (solo lectura) y usa la API de Modrinth:
+
+```bash
+cd launcher/src-tauri && cargo test --test live -- --ignored --nocapture
+```
+
+Probar la interfaz del launcher en el navegador, con datos de ejemplo y sin backend: `cd launcher && npm run dev` y abre http://localhost:1420.
 
 ```bash
 cd launcher && npm run check && npm test

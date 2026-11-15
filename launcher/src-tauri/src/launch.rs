@@ -54,6 +54,11 @@ pub async fn prepare(ctx: &LaunchContext<'_>, inst: &Instance, session: &Session
     let env = Env::current();
     let p = ctx.paths;
     let mut warnings = Vec::new();
+    if let Some(loader) = &inst.unsupported_loader {
+        return Err(Error::msg(format!(
+            "This installation uses {loader}. Cobalmoon runs on Fabric, so it cannot launch it; your installation is untouched."
+        )));
+    }
 
     progress(Progress { stage: "metadata", done: 0, total: 1 });
     let manifest = meta::fetch_manifest(ctx.http).await?;
@@ -75,7 +80,7 @@ pub async fn prepare(ctx: &LaunchContext<'_>, inst: &Instance, session: &Session
     let client = vanilla.downloads.as_ref().ok_or_else(|| Error::msg("version has no client download"))?;
     let client_jar = version_dir.join(format!("{}.jar", inst.mc_version));
     progress(Progress { stage: "client", done: 0, total: 1 });
-    fetch(ctx.http, &Download { url: client.client.url.clone(), path: client_jar.clone(), sha1: Some(client.client.sha1.clone()), size: Some(client.client.size) }).await?;
+    fetch(ctx.http, &Download { url: client.client.url.clone(), path: client_jar.clone(), sha1: Some(client.client.sha1.clone()), size: Some(client.client.size), ..Default::default() }).await?;
 
     // Libraries
     let mut libs = meta::library_downloads(&version, &p.libraries(), &env)?;
@@ -85,13 +90,21 @@ pub async fn prepare(ctx: &LaunchContext<'_>, inst: &Instance, session: &Session
     // Assets
     let index_ref = version.asset_index.clone().ok_or_else(|| Error::msg("version has no asset index"))?;
     let index_path = p.assets().join("indexes").join(format!("{}.json", index_ref.id));
-    fetch(ctx.http, &Download { url: index_ref.url.clone(), path: index_path.clone(), sha1: Some(index_ref.sha1.clone()), size: Some(index_ref.size) }).await?;
+    fetch(ctx.http, &Download { url: index_ref.url.clone(), path: index_path.clone(), sha1: Some(index_ref.sha1.clone()), size: Some(index_ref.size), ..Default::default() }).await?;
     let index: AssetIndex = serde_json::from_slice(&tokio::fs::read(&index_path).await?)?;
     fetch_all(ctx.http, meta::asset_downloads(&index, &p.assets()), 24, |d, t| progress(Progress { stage: "assets", done: d, total: t })).await?;
 
-    // Java
+    // Java: the version's runtime, unless a mod declares it needs a newer Java (e.g. C2ME → 22+).
     let component = version.java_version.as_ref().map(|j| j.component.clone()).unwrap_or_else(|| "java-runtime-delta".into());
-    let java = java::ensure_runtime(ctx.http, &p.runtimes(), &component, |d, t| progress(Progress { stage: "java", done: d, total: t })).await?;
+    let base_major = version.java_version.as_ref().map(|j| j.major_version).unwrap_or(0);
+    let (needed, needed_by) = required_java(inst, p);
+    let (java, used) = java::ensure_runtime(ctx.http, &p.runtimes(), &component, needed.max(base_major), |d, t| {
+        progress(Progress { stage: "java", done: d, total: t })
+    })
+    .await?;
+    if used != component {
+        warnings.push(format!("Using Java {needed} ({used}) because {} requires it.", needed_by.unwrap_or_else(|| "a mod".into())));
+    }
 
     // Game directory and natives dir
     let game_dir = inst.game_dir(p);
@@ -99,20 +112,35 @@ pub async fn prepare(ctx: &LaunchContext<'_>, inst: &Instance, session: &Session
     let natives = p.natives(&version.id);
     tokio::fs::create_dir_all(&natives).await?;
 
-    // Cobalmoon core mod
-    let mut extra_jvm = Vec::new();
+    // Mods loaded from outside the game folder: the Cobalmoon core and, for installations used in
+    // place, the mods the player added through Cobalmoon (so their own mods/ folder is untouched).
+    let mut add_mods: Vec<String> = Vec::new();
     if inst.cobalmoon {
         if !SUPPORTED_VERSIONS.contains(&inst.mc_version.as_str()) {
             warnings.push(format!("Cobalmoon core is not built for {} yet; launching Fabric without it.", inst.mc_version));
         } else {
             match ctx.core_mods_dir.as_deref().and_then(|d| core_mod_jar(d, &inst.mc_version)) {
-                Some(jar) => extra_jvm.push(format!("-Dfabric.addMods={}", jar.display())),
+                Some(jar) => add_mods.push(jar.display().to_string()),
                 None => warnings.push(format!(
                     "Cobalmoon core jar for {} not found; launching Fabric without it. Build it with `gradlew build` or set the folder in Settings.",
                     inst.mc_version
                 )),
             }
         }
+    }
+    if !inst.managed {
+        let extra = p.extra_mods(&inst.id);
+        let has_jars = std::fs::read_dir(&extra)
+            .map(|r| r.filter_map(|e| e.ok()).any(|e| e.path().extension().is_some_and(|x| x == "jar")))
+            .unwrap_or(false);
+        if has_jars {
+            add_mods.push(extra.display().to_string());
+        }
+    }
+    let mut extra_jvm = Vec::new();
+    if !add_mods.is_empty() {
+        let sep = if cfg!(windows) { ";" } else { ":" };
+        extra_jvm.push(format!("-Dfabric.addMods={}", add_mods.join(sep)));
     }
     let memory = inst.memory_mb.unwrap_or(4096).max(1024);
     extra_jvm.push(format!("-Xmx{memory}M"));
@@ -153,6 +181,30 @@ pub async fn prepare(ctx: &LaunchContext<'_>, inst: &Instance, session: &Session
     }
     progress(Progress { stage: "starting", done: 1, total: 1 });
     Ok(Prepared { java, args, game_dir, warnings })
+}
+
+/// Highest minimum Java version declared by the instance's Fabric mods, and which mod asks for it.
+fn required_java(inst: &Instance, p: &Paths) -> (u32, Option<String>) {
+    let mut dirs = vec![inst.game_dir(p).join("mods")];
+    if !inst.managed {
+        dirs.push(p.extra_mods(&inst.id));
+    }
+    let mut best = (0u32, None);
+    for dir in dirs {
+        for e in std::fs::read_dir(dir).into_iter().flatten().filter_map(|e| e.ok()) {
+            let path = e.path();
+            if path.extension().is_none_or(|x| x != "jar") {
+                continue;
+            }
+            let Ok(info) = crate::importers::read_mod_jar(&path) else { continue };
+            if let Some(n) = info.java.as_deref().and_then(java::min_java) {
+                if n > best.0 {
+                    best = (n, info.name.or(info.id));
+                }
+            }
+        }
+    }
+    best
 }
 
 fn expand(arg: &str, vars: &HashMap<&str, String>) -> String {

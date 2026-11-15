@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { overallProgress, errorText } from "./api";
+import { overallProgress, errorText, samePath, loaderLabel, loaderLaunchable, formatDownloads } from "./api";
+
+describe("import helpers", () => {
+  it("compares paths across separators, case and trailing slashes", () => {
+    expect(samePath("C:\\Users\\a\\.minecraft\\", "c:/users/a/.minecraft")).toBe(true);
+    expect(samePath("/home/a/x", "/home/a/y")).toBe(false);
+    expect(samePath(null, "/x")).toBe(false);
+  });
+
+  it("labels loaders and knows which can launch", () => {
+    expect(loaderLabel({ kind: "fabric", version: "0.20.1" })).toBe("Fabric 0.20.1");
+    expect(loaderLabel({ kind: "unknown" })).toBe("Desconocido");
+    expect(loaderLaunchable({ kind: "neoforge", version: "21.1" })).toBe(false);
+    expect(loaderLaunchable({ kind: "quilt", version: null })).toBe(true);
+  });
+
+  it("formats download counts", () => {
+    expect(formatDownloads(1_234_567)).toBe("1.2 M");
+    expect(formatDownloads(45_600)).toBe("46 k");
+    expect(formatDownloads(12)).toBe("12");
+  });
+});
 
 describe("overallProgress", () => {
   it("is monotonic across stages", () => {

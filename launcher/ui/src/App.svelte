@@ -6,12 +6,18 @@
     errorText,
     overallProgress,
     STAGE_LABEL,
+    SOURCE_LABEL,
     type Account,
     type Instance,
     type LaunchProgress,
     type Settings,
     type VersionOption,
   } from "./lib/api";
+  import ImportDialog from "./lib/ImportDialog.svelte";
+  import ModsPanel from "./lib/ModsPanel.svelte";
+
+  let showImport = $state(false);
+  let tab = $state<"play" | "mods">("play");
 
   let settings = $state<Settings | null>(null);
   let accounts = $state<Account[]>([]);
@@ -155,17 +161,20 @@
 
     <div class="section-head">
       <span>Perfiles</span>
-      <button class="btn ghost icon" title="Nuevo perfil" aria-label="Nuevo perfil" onclick={() => (showNew = true)}>＋</button>
+      <span class="head-actions">
+        <button class="btn ghost icon" title="Importar instalaciones" aria-label="Importar instalaciones" onclick={() => (showImport = true)}>⇩</button>
+        <button class="btn ghost icon" title="Nuevo perfil" aria-label="Nuevo perfil" onclick={() => (showNew = true)}>＋</button>
+      </span>
     </div>
     <nav class="profiles">
       {#each instances as inst (inst.id)}
-        <button class="profile" class:active={inst.id === selectedId} onclick={() => (selectedId = inst.id)}>
+        <button class="profile" class:active={inst.id === selectedId} class:blocked={!!inst.unsupportedLoader} onclick={() => (selectedId = inst.id)}>
           <span class="dot" class:on={running[inst.id]}></span>
           <span class="pname">{inst.name}</span>
           <span class="pver">{inst.mcVersion}</span>
         </button>
       {:else}
-        <p class="hint empty">Crea tu primer perfil para empezar.</p>
+        <p class="hint empty">Crea tu primer perfil o importa una instalación existente.</p>
       {/each}
     </nav>
 
@@ -212,9 +221,12 @@
             Minecraft {selected.mcVersion} · Fabric
             {#if selected.cobalmoon && supported(selected.mcVersion)}· Cobalmoon{/if}
             {#if selected.server}· {selected.server}{/if}
+            {#if selected.source}· {SOURCE_LABEL[selected.source.kind]}{selected.managed ? " (copia)" : " (en su sitio)"}{/if}
           </p>
-          {#if !supported(selected.mcVersion)}
-            <p class="hint">Cobalmoon aún no está disponible para {selected.mcVersion}: se lanzará solo con Fabric.</p>
+          {#if selected.unsupportedLoader}
+            <p class="hint warn">Usa {selected.unsupportedLoader}: Cobalmoon funciona sobre Fabric y no puede lanzarla. La instalación no se ha modificado.</p>
+          {:else if !supported(selected.mcVersion)}
+            <p class="hint">Cobalmoon aún no está disponible para {selected.mcVersion}: se lanzará solo con Fabric y tus mods.</p>
           {/if}
         </div>
 
@@ -228,20 +240,27 @@
               </span>
             </div>
           {/if}
-          <button class="btn primary play" disabled={!account || selRunning || busy === "launch"} onclick={play}>
+          <button class="btn primary play" disabled={!account || selRunning || busy === "launch" || !!selected.unsupportedLoader} onclick={play}>
             {selRunning ? "Jugando" : "Jugar"}
           </button>
           {#if !account}<span class="hint">Inicia sesión para jugar.</span>{/if}
         </div>
       </section>
 
-      <section class="console">
-        <div class="console-head">
-          <span>Registro</span>
-          <button class="btn ghost" onclick={() => removeProfile(selected.id)}>Quitar perfil</button>
-        </div>
-        <pre>{logs.join("\n") || "El registro del juego aparecerá aquí."}</pre>
-      </section>
+      <nav class="tabs" aria-label="Secciones del perfil">
+        <button class="tab" class:active={tab === "play"} onclick={() => (tab = "play")}>Registro</button>
+        <button class="tab" class:active={tab === "mods"} onclick={() => (tab = "mods")}>Mods</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" onclick={() => removeProfile(selected.id)} title="Solo lo quita de la lista; no borra archivos">Quitar perfil</button>
+      </nav>
+
+      {#if tab === "mods"}
+        <ModsPanel instance={selected} />
+      {:else}
+        <section class="console">
+          <pre>{logs.join("\n") || "El registro del juego aparecerá aquí."}</pre>
+        </section>
+      {/if}
     {:else}
       <section class="welcome">
         <img src="/logo.svg" alt="" width="96" height="96" />
@@ -252,6 +271,14 @@
     {/if}
   </main>
 </div>
+
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key !== "Escape") return;
+    showNew = false;
+    showSettings = false;
+  }}
+/>
 
 {#if showNew}
   <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && (showNew = false)}>
@@ -280,6 +307,20 @@
       </div>
     </form>
   </div>
+{/if}
+
+{#if showImport}
+  <ImportDialog
+    {instances}
+    versions={versions}
+    onclose={() => (showImport = false)}
+    onimported={async (inst) => {
+      instances = await api.listInstances();
+      selectedId = inst.id;
+      tab = "mods";
+      showImport = false;
+    }}
+  />
 {/if}
 
 {#if showSettings && settings}
@@ -392,10 +433,15 @@
     background: var(--cm-color-accent);
     box-shadow: 0 0 8px var(--cm-color-accent);
   }
+  /* Long names wrap (up to two lines) instead of being cut off. */
   .pname {
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.3;
   }
   .pver {
     color: var(--cm-color-lunar);
@@ -514,17 +560,6 @@
     border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 22%, transparent);
     border-radius: var(--cm-radius-lg);
   }
-  .console-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 6px 6px 14px;
-    color: var(--cm-color-lunar);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border-bottom: 1px solid color-mix(in srgb, var(--cm-color-lunar) 22%, transparent);
-  }
   pre {
     flex: 1;
     margin: 0;
@@ -555,23 +590,40 @@
   .sidebar-foot {
     display: flex;
   }
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    background: color-mix(in srgb, var(--cm-color-night-sunken) 75%, transparent);
-    backdrop-filter: blur(4px);
+  .tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-bottom: 1px solid color-mix(in srgb, var(--cm-color-lunar) 22%, transparent);
   }
-  .dialog {
-    width: min(460px, calc(100vw - 32px));
-    display: grid;
-    gap: var(--cm-space-md);
-    background: var(--cm-color-night-raised);
-    border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 35%, transparent);
-    border-radius: var(--cm-radius-lg);
-    padding: var(--cm-space-lg);
-    animation: cm-fade-up var(--cm-motion-normal) var(--cm-motion-easing);
+  .tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    color: var(--cm-color-lunar);
+    cursor: pointer;
+    transition: color var(--cm-motion-fast) var(--cm-motion-easing), border-color var(--cm-motion-fast) var(--cm-motion-easing);
+  }
+  .tab:hover {
+    color: var(--cm-color-stone);
+  }
+  .tab.active {
+    color: var(--cm-color-stone);
+    border-bottom-color: var(--cm-color-accent);
+  }
+  .spacer {
+    flex: 1;
+  }
+  .head-actions {
+    display: flex;
+    gap: 2px;
+  }
+  .profile.blocked .pname {
+    color: var(--cm-color-lunar);
+  }
+  .hint.warn {
+    color: var(--cm-color-warning);
   }
   .actions {
     display: flex;

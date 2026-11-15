@@ -54,6 +54,9 @@ jobs:
       fail-fast: false
       matrix:
         mc: ["26.3", "1.21.11"]
+        # "-Pcompat" adds the third-party mods pinned in tests/compat/mods-<mc>.json
+        # (Sodium, Lithium, Iris, Mod Menu, ReplayMod, Xaero's Minimap + dependencies).
+        mods: ["", "-Pcompat"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -66,11 +69,11 @@ jobs:
       - name: Xvfb and Mesa
         run: sudo apt-get update && sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri
       - name: Client game test
-        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :client-core:mc-${{ matrix.mc }}:runClientGameTest
+        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :client-core:mc-${{ matrix.mc }}:runClientGameTest ${{ matrix.mods }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gametest-screenshots-${{ matrix.mc }}
+          name: gametest-screenshots-${{ matrix.mc }}${{ matrix.mods }}
           path: client-core/versions/${{ matrix.mc }}/build/run/clientGameTest/screenshots/
 
   launcher:

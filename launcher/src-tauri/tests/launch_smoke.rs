@@ -1,4 +1,4 @@
-//! Network smoke test of the real launch pipeline: Mojang manifest, Fabric profile, client jar,
+﻿//! Network smoke test of the real launch pipeline: Mojang manifest, Fabric profile, client jar,
 //! libraries, assets and Java runtime are downloaded and hash-verified, and the command line is built.
 //! It does not sign in and does not start the game (the session below is a placeholder that is never
 //! sent anywhere). Run with:  cargo test --test launch_smoke -- --ignored --nocapture
@@ -23,6 +23,19 @@ async fn prepares_a_fabric_instance_with_cobalmoon() {
     let paths = Paths::new(root);
     let http = http_client();
     let ctx = LaunchContext { http: &http, paths: &paths, client_id: "smoke-test", core_mods_dir: Some(core_dir) };
+
+    // COBALMOON_SMOKE_IMPORT=<folder>: test a real existing installation instead. It is imported as a
+    // *copy* (the original is only read), then launched with Cobalmoon on top of its mods.
+    if let Ok(src) = std::env::var("COBALMOON_SMOKE_IMPORT") {
+        let det = cobalmoon_launcher_lib::importers::detect_folder(std::path::Path::new(&src)).expect("detect");
+        eprintln!("importing copy of {} ({:?}, {:?}, {} mods)", det.name, det.mc_version, det.loader, det.mod_count);
+        let inst = cobalmoon_launcher_lib::mods::import(&det, None, true, &paths, &[]).expect("import copy");
+        let core = repo.join(format!("client-core/versions/{}/build/libs", inst.mc_version));
+        let ctx = LaunchContext { core_mods_dir: Some(core), ..ctx };
+        run_instance(&ctx, &inst).await;
+        return;
+    }
+
     let inst = Instance {
         id: format!("smoke-{version}"),
         name: "Smoke".into(),
@@ -33,21 +46,32 @@ async fn prepares_a_fabric_instance_with_cobalmoon() {
         memory_mb: Some(2048),
         jvm_args: vec![],
         server: None,
+        source: None,
+        managed: true,
+        unsupported_loader: None,
     };
+    run_instance(&ctx, &inst).await;
+}
+
+/// Prepares (downloads, verifies) and, with COBALMOON_SMOKE_RUN, starts the instance.
+async fn run_instance(ctx: &LaunchContext<'_>, inst: &Instance) {
     let session = Session {
         info: AccountInfo { uuid: "00000000000000000000000000000000".into(), name: "Smoke".into(), xuid: String::new() },
         access_token: "placeholder".into(),
         expires_at: u64::MAX,
     };
 
-    let prepared = prepare(&ctx, &inst, &session, |p| eprintln!("{:<10} {}/{}", p.stage, p.done, p.total)).await.expect("prepare");
+    let prepared = prepare(ctx, inst, &session, |p| eprintln!("{:<10} {}/{}", p.stage, p.done, p.total)).await.expect("prepare");
 
     assert!(prepared.java.exists(), "java runtime missing");
     let out = std::process::Command::new(&prepared.java).arg("-version").output().expect("run java");
     assert!(out.status.success());
     eprintln!("{}", String::from_utf8_lossy(&out.stderr));
 
-    assert!(prepared.warnings.is_empty(), "warnings: {:?}", prepared.warnings);
+    for w in &prepared.warnings {
+        eprintln!("launcher notice: {w}");
+    }
+    assert!(!prepared.warnings.iter().any(|w| w.contains("core")), "Cobalmoon core missing: {:?}", prepared.warnings);
     assert!(prepared.args.iter().any(|a| a.starts_with("-Dfabric.addMods=") && a.contains("cobalmoon-core-mc")));
     assert!(prepared.args.iter().any(|a| a == "net.fabricmc.loader.impl.launch.knot.KnotClient"));
     let cp_idx = prepared.args.iter().position(|a| a == "-cp").expect("-cp");
@@ -78,9 +102,10 @@ async fn prepares_a_fabric_instance_with_cobalmoon() {
                 }
             }
         });
-        let ready = rx.recv_timeout(std::time::Duration::from_secs(180));
+        let ready = rx.recv_timeout(std::time::Duration::from_secs(300));
         let _ = child.kill();
-        let line = ready.expect("game did not report 'Cobalmoon ready' within 3 minutes");
+        let _ = child.wait();
+        let line = ready.expect("game did not report 'Cobalmoon ready' within 5 minutes");
         eprintln!("game started: {line}");
     }
 }

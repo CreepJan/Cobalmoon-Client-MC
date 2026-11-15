@@ -1,0 +1,61 @@
+{
+  "minecraft": "1.21.11",
+  "mods": [
+    {
+      "slug": "iris",
+      "projectId": "YL57xq9U",
+      "version": "1.10.8+1.21.11-fabric",
+      "file": "iris-fabric-1.10.8+mc1.21.11.jar",
+      "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/ka9PDlsN/iris-fabric-1.10.8%2Bmc1.21.11.jar",
+      "sha512": "f0cad4b6af593b6fc25738c4ef5a2b346125f9693d25a0d486858e54798d2ea87b24d1497e1bb4391729d7d9e490f42771f7fb468d4e1420e372d8643f9e2055"
+    },
+    {
+      "slug": "lithium",
+      "projectId": "gvQqBUqZ",
+      "version": "mc1.21.11-0.21.4-fabric",
+      "file": "lithium-fabric-0.21.4+mc1.21.11.jar",
+      "url": "https://cdn.modrinth.com/data/gvQqBUqZ/versions/Ow7wA0kG/lithium-fabric-0.21.4%2Bmc1.21.11.jar",
+      "sha512": "f14a5c3d2fad786347ca25083f902139694f618b7c103947f2fd067a7c5ee88a63e1ef8926f7d693ea79ed7d00f57317bae77ef9c2d630bf5ed01ac97a752b94"
+    },
+    {
+      "slug": "modmenu",
+      "projectId": "mOgUt4GM",
+      "version": "17.0.1",
+      "file": "modmenu-17.0.1.jar",
+      "url": "https://cdn.modrinth.com/data/mOgUt4GM/versions/cLkYaVuL/modmenu-17.0.1.jar",
+      "sha512": "cb68cc39c8da66d05a1d2054a0e7b62144881e0cdb5fd681bc4f337b1313fafac394246f4e0aa0c4b6343db9e9750250a00c1bb72689b762da685ce1ccfee51f"
+    },
+    {
+      "slug": "placeholder-api",
+      "projectId": "eXts2L7r",
+      "version": "2.8.2+1.21.10",
+      "file": "placeholder-api-2.8.2+1.21.10.jar",
+      "url": "https://cdn.modrinth.com/data/eXts2L7r/versions/qxjzQ9xY/placeholder-api-2.8.2%2B1.21.10.jar",
+      "sha512": "507ab10b7938dcd14d33121b8462649bdbe575cef248e917dfdf7566078ab5d0195ca1add95eae4863de3f652eb56db0a8669a67d5b5344e094d086f9dab5a08"
+    },
+    {
+      "slug": "replaymod",
+      "projectId": "Nv2fQJo5",
+      "version": "1.21.11-2.6.28",
+      "file": "replaymod-1.21.11-2.6.28.jar",
+      "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/KJkQjrpd/replaymod-1.21.11-2.6.28.jar",
+      "sha512": "a11abf7ca1d98db6194ffdf203677bf061e236af5f6dff56c62da28ed1b822b9c2ecf81dcaef65fcff7444a10047c9c749b63edcaeca53c4abc1e185d35e1465"
+    },
+    {
+      "slug": "sodium",
+      "projectId": "AANobbMI",
+      "version": "mc1.21.11-0.8.14-fabric",
+      "file": "sodium-fabric-0.8.14+mc1.21.11.jar",
+      "url": "https://cdn.modrinth.com/data/AANobbMI/versions/rkdTcxoT/sodium-fabric-0.8.14%2Bmc1.21.11.jar",
+      "sha512": "04c43f9e8534b87a52c42ffd51b0e344d4ef92dc9cc52da33d13af6a18bf74b05380d2027f1e0db982698d0aff274c42741c1e21b313b0cd75ed3af005fc98d9"
+    },
+    {
+      "slug": "xaeros-minimap",
+      "projectId": "1bokaNcj",
+      "version": "fabric-1.21.11-26.6.2",
+      "file": "xaerominimap-fabric-1.21.11-26.6.2.jar",
+      "url": "https://cdn.modrinth.com/data/1bokaNcj/versions/g0LRDWwe/xaerominimap-fabric-1.21.11-26.6.2.jar",
+      "sha512": "dd6cb67230b0790f22c4eb7c4bd383a3fe7047e5d0cb0c3acf53b263eaef25c6410ede7b6b5789f2a77d7b6cd294f08d7301f3ceea48d85d2328594de02438fd"
+    }
+  ]
+}

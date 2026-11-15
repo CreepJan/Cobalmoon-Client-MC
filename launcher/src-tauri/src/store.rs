@@ -23,6 +23,7 @@ impl Paths {
     pub fn runtimes(&self) -> PathBuf { self.root.join("runtimes") }
     pub fn instances(&self) -> PathBuf { self.root.join("instances") }
     pub fn natives(&self, version_id: &str) -> PathBuf { self.root.join("natives").join(version_id) }
+    pub fn extra_mods(&self, instance_id: &str) -> PathBuf { self.root.join("extra-mods").join(instance_id) }
     fn file(&self, name: &str) -> PathBuf { self.root.join(name) }
 }
 
@@ -71,6 +72,24 @@ pub struct Instance {
     /// Server to join directly on launch (server profile).
     #[serde(default)]
     pub server: Option<String>,
+    /// Where the instance was imported from, if anywhere.
+    #[serde(default)]
+    pub source: Option<ImportSource>,
+    /// True when Cobalmoon owns the game folder (created here, copied or installed from a .mrpack).
+    /// False for installations used in place: their mods/ folder is never written to; mods added
+    /// through Cobalmoon go to `extra-mods/<id>` and are loaded with -Dfabric.addMods.
+    #[serde(default = "yes")]
+    pub managed: bool,
+    /// Set when the installation uses a loader Cobalmoon cannot launch (Forge, NeoForge).
+    #[serde(default)]
+    pub unsupported_loader: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSource {
+    pub kind: crate::importers::SourceKind,
+    pub path: String,
 }
 
 fn yes() -> bool {
@@ -82,6 +101,15 @@ impl Instance {
         match &self.game_dir {
             Some(d) if !d.trim().is_empty() => PathBuf::from(d),
             _ => paths.instances().join(&self.id),
+        }
+    }
+
+    /// Folder that receives mods added through Cobalmoon.
+    pub fn mods_target(&self, paths: &Paths) -> PathBuf {
+        if self.managed {
+            self.game_dir(paths).join("mods")
+        } else {
+            paths.extra_mods(&self.id)
         }
     }
 }

@@ -15,6 +15,12 @@ export interface Account {
   xuid: string;
 }
 
+export type SourceKind = "vanilla" | "prism" | "curseforge" | "modrinth" | "folder";
+
+export type Loader =
+  | { kind: "vanilla" | "unknown" }
+  | { kind: "fabric" | "quilt" | "forge" | "neoforge"; version: string | null };
+
 export interface Instance {
   id: string;
   name: string;
@@ -25,6 +31,45 @@ export interface Instance {
   memoryMb: number | null;
   jvmArgs: string[];
   server: string | null;
+  source: { kind: SourceKind; path: string } | null;
+  managed: boolean;
+  unsupportedLoader: string | null;
+}
+
+export interface Detected {
+  kind: SourceKind;
+  name: string;
+  gameDir: string;
+  mcVersion: string | null;
+  loader: Loader;
+  modCount: number;
+}
+
+export interface ModEntry {
+  fileName: string;
+  path: string;
+  id: string | null;
+  name: string | null;
+  version: string | null;
+  location: "instance" | "cobalmoon";
+  removable: boolean;
+  enabled: boolean;
+  fabric: boolean;
+}
+
+export interface SearchHit {
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  iconUrl: string | null;
+  downloads: number;
+  author: string;
+}
+
+export interface InstallReport {
+  installed: string[];
+  warnings: string[];
 }
 
 export interface VersionOption {
@@ -64,7 +109,48 @@ export const api = {
   updateInstance: (instance: Instance) => invoke<Instance>("update_instance", { instance }),
   removeInstance: (id: string) => invoke<void>("remove_instance", { id }),
   launch: (instanceId: string, accountUuid: string) => invoke<void>("launch_instance", { instanceId, accountUuid }),
+  detectInstallations: () => invoke<Detected[]>("detect_installations"),
+  inspectFolder: (path: string) => invoke<Detected>("inspect_folder", { path }),
+  importInstallation: (detected: Detected, mcVersion: string | null, copy: boolean) =>
+    invoke<Instance>("import_installation", { detected, mcVersion, copy }),
+  importMrpack: (path: string) => invoke<Instance>("import_mrpack", { path }),
+  listMods: (instanceId: string) => invoke<ModEntry[]>("list_mods", { instanceId }),
+  addJar: (instanceId: string, path: string) => invoke<{ fileName: string; note: string | null }>("add_jar", { instanceId, path }),
+  removeMod: (instanceId: string, path: string) => invoke<void>("remove_mod", { instanceId, path }),
+  modrinthSearch: (query: string, mcVersion: string, offset = 0) => invoke<SearchHit[]>("modrinth_search", { query, mcVersion, offset }),
+  modrinthInstall: (instanceId: string, projects: string[]) => invoke<InstallReport>("modrinth_install", { instanceId, projects }),
 };
+
+export const SOURCE_LABEL: Record<SourceKind, string> = {
+  vanilla: "Launcher oficial",
+  prism: "Prism / MultiMC",
+  curseforge: "CurseForge",
+  modrinth: "Modrinth",
+  folder: "Carpeta",
+};
+
+export function loaderLabel(l: Loader): string {
+  const names = { vanilla: "Vanilla", unknown: "Desconocido", fabric: "Fabric", quilt: "Quilt", forge: "Forge", neoforge: "NeoForge" };
+  const v = "version" in l && l.version ? ` ${l.version}` : "";
+  return names[l.kind] + v;
+}
+
+/** Cobalmoon runs on Fabric; Quilt usually works, Forge/NeoForge cannot. */
+export function loaderLaunchable(l: Loader): boolean {
+  return l.kind !== "forge" && l.kind !== "neoforge";
+}
+
+/** Normalises paths so an already-imported installation can be recognised. */
+export function samePath(a: string | null | undefined, b: string | null | undefined): boolean {
+  const n = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return !!a && !!b && n(a) === n(b);
+}
+
+export function formatDownloads(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)} k`;
+  return String(n);
+}
 
 export const events = {
   onProgress: (cb: (p: LaunchProgress) => void): Promise<UnlistenFn> => listen<LaunchProgress>("launch-progress", (e) => cb(e.payload)),

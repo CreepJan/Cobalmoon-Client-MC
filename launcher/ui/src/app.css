@@ -113,6 +113,31 @@ select {
   color: var(--cm-color-lunar);
 }
 
+/* Modal dialogs (shared by every component). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--cm-color-night-sunken) 75%, transparent);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+}
+.dialog {
+  width: min(460px, calc(100vw - 32px));
+  display: grid;
+  gap: var(--cm-space-md);
+  background: var(--cm-color-night-raised);
+  border: 1px solid color-mix(in srgb, var(--cm-color-lunar) 35%, transparent);
+  border-radius: var(--cm-radius-lg);
+  padding: var(--cm-space-lg);
+  animation: cm-fade-up var(--cm-motion-normal) var(--cm-motion-easing);
+}
+.dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
 @keyframes cm-fade-up {
   from {
     opacity: 0;

@@ -35,8 +35,17 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
         });
         ctx.waitFor(mc -> reload.isDone(), 20 * 60);
 
+        // Compatibility run (-Pcompat): every pinned third-party mod must actually be loaded.
+        if (System.getProperty("cobalmoon.compat") != null) {
+            List<String> loaded = checkCompatModsLoaded();
+            dev.cobalmoon.core.CobalmoonClient.LOG.info("Compatibility test running alongside: {}", loaded);
+        }
+
         try (TestSingleplayerContext world = ctx.worldBuilder().create()) {
             ctx.waitTicks(40);
+            if (System.getProperty("cobalmoon.compat") != null) {
+                ctx.takeScreenshot("cobalmoon-compat-world");
+            }
 
             // 1. Defaults: five built-in modules, HUD modules on, coordinates and crosshair off.
             List<String> ids = ctx.computeOnClient(mc -> Cobalmoon.api().modules().all().stream().map(Module::id).toList());
@@ -103,6 +112,24 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
             ctx.waitTicks(2);
             ctx.takeScreenshot("cobalmoon-hud-after");
         }
+    }
+
+    /** Each jar passed through fabric.addMods must belong to a loaded mod. Returns "id version" strings. */
+    private static List<String> checkCompatModsLoaded() {
+        String prop = System.getProperty("fabric.addMods", "");
+        List<Path> jars = java.util.Arrays.stream(prop.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator)))
+                .filter(s -> !s.isBlank()).map(s -> Path.of(s).toAbsolutePath().normalize()).toList();
+        check(!jars.isEmpty(), "no compatibility mods were passed");
+        List<String> loaded = new java.util.ArrayList<>();
+        for (Path jar : jars) {
+            var match = FabricLoader.getInstance().getAllMods().stream()
+                    .filter(m -> m.getOrigin().getKind() == net.fabricmc.loader.api.metadata.ModOrigin.Kind.PATH
+                            && m.getOrigin().getPaths().stream().anyMatch(p -> p.toAbsolutePath().normalize().equals(jar)))
+                    .findFirst();
+            check(match.isPresent(), "compat mod not loaded: " + jar.getFileName());
+            loaded.add(match.get().getMetadata().getId() + " " + match.get().getMetadata().getVersion().getFriendlyString());
+        }
+        return loaded;
     }
 
     private static Module module(String id) {

@@ -4,9 +4,12 @@ pub mod auth;
 pub mod download;
 pub mod error;
 pub mod fabric;
+pub mod importers;
 pub mod java;
 pub mod launch;
 pub mod meta;
+pub mod modrinth;
+pub mod mods;
 pub mod rules;
 pub mod store;
 
@@ -162,6 +165,9 @@ fn create_instance(state: State<'_, AppState>, req: NewInstance) -> Result<Insta
         memory_mb: None,
         jvm_args: Vec::new(),
         server: req.server.filter(|s| !s.trim().is_empty()),
+        source: None,
+        managed: true,
+        unsupported_loader: None,
     };
     all.push(inst.clone());
     store::save_instances(&state.paths, &all)?;
@@ -286,10 +292,144 @@ async fn launch_inner(app: &AppHandle, state: &AppState, inst: &Instance, accoun
     Ok(())
 }
 
+// ---- Phase 3: imports, mods, Modrinth ------------------------------------------------------
+
+fn find_instance(state: &AppState, id: &str) -> Result<Instance> {
+    store::load_instances(&state.paths).into_iter().find(|i| i.id == id).ok_or_else(|| Error::msg("profile not found"))
+}
+
+fn add_instance(state: &AppState, inst: Instance) -> Result<Instance> {
+    let mut all = store::load_instances(&state.paths);
+    all.push(inst.clone());
+    store::save_instances(&state.paths, &all)?;
+    Ok(inst)
+}
+
+#[tauri::command]
+async fn detect_installations() -> Vec<importers::Detected> {
+    tauri::async_runtime::spawn_blocking(|| importers::detect_all(&importers::Roots::for_this_os())).await.unwrap_or_default()
+}
+
+#[tauri::command]
+fn inspect_folder(path: String) -> Result<importers::Detected> {
+    importers::detect_folder(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+async fn import_installation(state: State<'_, AppState>, detected: importers::Detected, mc_version: Option<String>, copy: bool) -> Result<Instance> {
+    let paths = state.paths.clone();
+    let existing = store::load_instances(&paths);
+    let inst = tauri::async_runtime::spawn_blocking(move || mods::import(&detected, mc_version, copy, &paths, &existing))
+        .await
+        .map_err(|e| Error::msg(e.to_string()))??;
+    add_instance(&state, inst)
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ImportProgress {
+    done: usize,
+    total: usize,
+}
+
+#[tauri::command]
+async fn import_mrpack(app: AppHandle, state: State<'_, AppState>, path: String) -> Result<Instance> {
+    let pack = PathBuf::from(&path);
+    let index = modrinth::read_mrpack_index(&pack)?;
+    let info = modrinth::mrpack_info(&index)?;
+    if let Some(other) = &info.other_loader {
+        return Err(Error::msg(format!("This modpack needs {other}; Cobalmoon runs on Fabric.")));
+    }
+    let existing = store::load_instances(&state.paths);
+    let taken: Vec<String> = existing.iter().map(|i| i.id.clone()).collect();
+    let id = store::slug(&info.name, &taken);
+    let game_dir = state.paths.instances().join(&id);
+    modrinth::install_mrpack(&state.http, &pack, &game_dir, |done, total| {
+        let _ = app.emit("import-progress", ImportProgress { done, total });
+    })
+    .await?;
+    add_instance(
+        &state,
+        Instance {
+            id,
+            name: info.name,
+            mc_version: info.mc_version,
+            loader_version: info.fabric_loader,
+            cobalmoon: true,
+            game_dir: None,
+            memory_mb: None,
+            jvm_args: Vec::new(),
+            server: None,
+            source: Some(store::ImportSource { kind: importers::SourceKind::Modrinth, path }),
+            managed: true,
+            unsupported_loader: None,
+        },
+    )
+}
+
+#[tauri::command]
+fn list_mods(state: State<'_, AppState>, instance_id: String) -> Result<Vec<mods::ModEntry>> {
+    Ok(mods::list(&find_instance(&state, &instance_id)?, &state.paths))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AddJarResult {
+    file_name: String,
+    note: Option<String>,
+}
+
+#[tauri::command]
+fn add_jar(state: State<'_, AppState>, instance_id: String, path: String) -> Result<AddJarResult> {
+    let (file_name, note) = mods::add_jar(&find_instance(&state, &instance_id)?, &state.paths, std::path::Path::new(&path))?;
+    Ok(AddJarResult { file_name, note })
+}
+
+#[tauri::command]
+fn remove_mod(state: State<'_, AppState>, instance_id: String, path: String) -> Result<()> {
+    mods::remove(&find_instance(&state, &instance_id)?, &state.paths, std::path::Path::new(&path))
+}
+
+#[tauri::command]
+async fn modrinth_search(state: State<'_, AppState>, query: String, mc_version: String, offset: u32) -> Result<Vec<modrinth::SearchHit>> {
+    modrinth::Modrinth::new(state.http.clone()).search(&query, &mc_version, offset).await
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallReport {
+    installed: Vec<String>,
+    warnings: Vec<String>,
+}
+
+/// Installs Modrinth projects (ids or slugs) and their required dependencies into the instance.
+/// `projects == ["@pvp-preset"]` installs the PvP performance preset.
+#[tauri::command]
+async fn modrinth_install(state: State<'_, AppState>, instance_id: String, projects: Vec<String>) -> Result<InstallReport> {
+    let inst = find_instance(&state, &instance_id)?;
+    if let Some(loader) = &inst.unsupported_loader {
+        return Err(Error::msg(format!("This installation uses {loader}; Fabric mods would not load.")));
+    }
+    let wanted: Vec<String> = if projects.iter().any(|p| p == "@pvp-preset") {
+        modrinth::PVP_PRESET.iter().map(|s| s.to_string()).collect()
+    } else {
+        projects
+    };
+    let api = modrinth::Modrinth::new(state.http.clone());
+    let paths = state.paths.clone();
+    let inst2 = inst.clone();
+    let hashes = tauri::async_runtime::spawn_blocking(move || mods::hashes(&inst2, &paths)).await.map_err(|e| Error::msg(e.to_string()))?;
+    let installed: HashMap<String, modrinth::Version> = api.identify(&hashes).await?.into_values().map(|v| (v.project_id.clone(), v)).collect();
+    let plan = modrinth::resolve(&api, &wanted, &inst.mc_version, &installed).await?;
+    let names = modrinth::install(&state.http, &plan, &inst.mods_target(&state.paths)).await?;
+    Ok(InstallReport { installed: names, warnings: plan.warnings })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             std::fs::create_dir_all(&root)?;
@@ -312,7 +452,16 @@ pub fn run() {
             create_instance,
             update_instance,
             remove_instance,
-            launch_instance
+            launch_instance,
+            detect_installations,
+            inspect_folder,
+            import_installation,
+            import_mrpack,
+            list_mods,
+            add_jar,
+            remove_mod,
+            modrinth_search,
+            modrinth_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cobalmoon launcher");
