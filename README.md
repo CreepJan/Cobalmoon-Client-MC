@@ -8,7 +8,16 @@ telemetría y sin tienda. Compatible con mods de Fabric e instalaciones existent
 > Cobalmoon Client no está afiliado a Mojang ni a Microsoft. «Minecraft» es una marca de Mojang Synergies AB.
 > El launcher descarga el juego de los servidores oficiales de Mojang; no redistribuimos su código ni sus assets.
 
-## Estado: Fase 4 (beta en curso)
+## Estado: Fase 5 (beta)
+
+**Fase 5: diferenciadores** ([detalles](docs/phase5.md)):
+- **Análisis post-pelea:** comparado con tus peleas anteriores.
+- **Replay ligero:** las últimas 10 peleas en un mapa con línea de tiempo.
+- **Modo entrenamiento:** CPS, puntería al strafear, W-tap y bridging. Solo mide, nunca juega por ti.
+- **Perfiles automáticos por servidor.**
+- **Configuraciones compartibles:** con un código `CBM1:…`.
+
+### Fase 4
 
 **Fase 4: módulos PvP completos** ([detalles](docs/pvp-modules.md)):
 - **HUD:** ping, combo, reach, críticos, armadura, efectos, cooldown y temporizadores.

@@ -8,6 +8,8 @@ public enum Category {
     HUD,
     VISUAL,
     GAMEPLAY,
+    /** Fight analysis and practice: measures your play, never plays for you. */
+    TRAINING,
     PERFORMANCE,
     OTHER;
 

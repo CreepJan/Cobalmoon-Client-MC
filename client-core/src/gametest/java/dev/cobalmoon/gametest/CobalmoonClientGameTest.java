@@ -294,6 +294,114 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
         });
         ctx.waitTicks(2);
         ctx.takeScreenshot("cobalmoon-shield-low");
+
+        phase5Checks(ctx, world);
+    }
+
+    /** Phase 5: fight analysis + replay, shareable codes, server profiles, training. */
+    private static void phase5Checks(ClientGameTestContext ctx, TestSingleplayerContext world) {
+        var server = world.getServer();
+        var fights = (dev.cobalmoon.core.modules.FightAnalysisModule) module("fight_analysis");
+
+        // --- Fight analysis: a fight against a mob (enabled for the test), ended by the target dying.
+        ctx.runOnClient(mc -> {
+            fights.setting("mobs").fromJson(true);
+            fights.setting("timeout").fromJson(3.0);
+        });
+        server.runCommand("execute as @p at @s run summon minecraft:villager ^ ^ ^2 {NoAI:1b,Silent:1b}");
+        ctx.waitTicks(10);
+        for (int i = 0; i < 3; i++) {
+            ctx.runOnClient(mc -> {
+                if (mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult ehr) mc.gameMode.attack(mc.player, ehr.getEntity());
+            });
+            ctx.waitTicks(12);
+        }
+        server.runCommand("kill @e[type=minecraft:villager]");
+        ctx.waitTicks(80); // death animation or timeout ends the fight
+        var latest = ctx.computeOnClient(mc -> fights.history().latest());
+        check(latest != null && latest.hits() >= 1 && latest.track().size() > 2,
+                "fight recorded with hits and a replay track: " + latest);
+        ctx.takeScreenshot("cobalmoon-fight-summary");
+
+        // Replay viewer inside the editor.
+        ctx.getInput().pressKey(RIGHT_SHIFT);
+        ctx.waitFor(mc -> Platform.currentEditor() != null);
+        ctx.runOnClient(mc -> {
+            HudEditor ed = Platform.currentEditor();
+            ed.openReplay(fights.history().replays());
+            ed.replay().seek(latest.durationMs() / 2000f);
+        });
+        ctx.waitTicks(3);
+        ctx.takeScreenshot("cobalmoon-replay");
+        ctx.runOnClient(mc -> Platform.currentEditor().keyPressed(256, false));
+        check(ctx.computeOnClient(mc -> Platform.currentEditor() != null && Platform.currentEditor().replay() == null),
+                "Esc closes the replay but not the editor");
+
+        // --- Shareable code: copy, change something, paste back.
+        HudElement fps = module("fps").hudElements().get(0);
+        ctx.runOnClient(mc -> {
+            HudEditor ed = Platform.currentEditor();
+            float scale = fps.layout().scale;
+            ed.copyCode(dev.cobalmoon.core.share.ConfigShare.Scope.ALL);
+            String code = mc.keyboardHandler.getClipboard();
+            check(code.startsWith("CBM1:"), "clipboard has a Cobalmoon code");
+            fps.layout().setScale(0.5f);
+            module("crosshair").setEnabled(false);
+            ed.pasteCode();
+            check(fps.layout().scale == scale, "pasted code restored the FPS scale: " + fps.layout().scale + " vs " + scale);
+            check(module("crosshair").isEnabled(), "pasted code restored module state");
+            check(ed.shareStatus().length() > 0, "status shown");
+            ed.importCode("not a code");
+            check(ed.shareStatus().length() > 0, "bad code reported, not crashed");
+        });
+        ctx.runOnClient(mc -> Platform.closeScreen());
+
+        // --- Server profile: saved for example.net, applied on a subdomain, restored on leave.
+        var profiles = (dev.cobalmoon.core.modules.ServerProfilesModule) module("server_profiles");
+        ctx.runOnClient(mc -> {
+            float normal = fps.layout().scale;
+            fps.layout().setScale(2.5f);
+            profiles.saveFor("example.net", dev.cobalmoon.core.share.ConfigShare.collect(
+                    Cobalmoon.api().modules().all(), dev.cobalmoon.core.share.ConfigShare.Scope.ALL, dev.cobalmoon.core.share.ConfigShare.NOT_SHARED));
+            fps.layout().setScale(normal);
+            profiles.simulateJoin("mc.example.net:25565");
+            check("example.net".equals(profiles.activeHost()), "profile of the parent domain loaded");
+            check(fps.layout().scale == 2.5f, "profile applied: " + fps.layout().scale);
+            profiles.simulateLeave();
+            check(fps.layout().scale == normal, "your normal settings restored on leave: " + fps.layout().scale);
+        });
+
+        // --- Training: CPS (clicks counted) and strafe aim (practice target spawned, aim measured).
+        var training = (dev.cobalmoon.core.modules.TrainingModule) module("training");
+        ctx.runOnClient(mc -> {
+            training.setEnabled(true);
+            training.configure(dev.cobalmoon.core.modules.TrainingModule.Exercise.CPS, 5);
+            training.start();
+        });
+        ctx.waitTicks(65); // 3 s countdown
+        for (int i = 0; i < 12; i++) {
+            ctx.getInput().pressMouse(0);
+            ctx.waitTicks(2);
+        }
+        ctx.waitTicks(90);
+        List<String> cpsResult = ctx.computeOnClient(mc -> training.lastResult());
+        check(cpsResult.size() >= 3 && cpsResult.stream().anyMatch(l -> l.matches(".*\\D(2|3)\\.\\d.*")),
+                "CPS result around 12 clicks / 5 s: " + cpsResult);
+        ctx.takeScreenshot("cobalmoon-training-cps");
+
+        ctx.runOnClient(mc -> {
+            training.configure(dev.cobalmoon.core.modules.TrainingModule.Exercise.AIM, 5);
+            training.start();
+        });
+        ctx.waitTicks(65 + 110);
+        List<String> aimResult = ctx.computeOnClient(mc -> training.lastResult());
+        check(aimResult.size() >= 3 && aimResult.get(1).matches(".*\\D(\\d\\d|100)%.*"),
+                "aim result measured the practice target in front of the player: " + aimResult);
+        ctx.takeScreenshot("cobalmoon-training-aim");
+        ctx.waitTicks(10);
+        check(ctx.computeOnClient(mc -> mc.level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                mc.player.getBoundingBox().inflate(10), e -> e.getType().getDescriptionId().equals("entity.minecraft.villager")).isEmpty()),
+                "practice target removed afterwards");
     }
 
     /** Each jar passed through fabric.addMods must belong to a loaded mod. Returns "id version" strings. */

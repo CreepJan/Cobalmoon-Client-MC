@@ -16,6 +16,7 @@ import dev.cobalmoon.core.modules.CrosshairModule;
 import dev.cobalmoon.core.render.GuiCanvas;
 import dev.cobalmoon.core.render.HudRenderer;
 import dev.cobalmoon.core.render.HudRenderer.Bounds;
+import dev.cobalmoon.core.share.ConfigShare;
 import dev.cobalmoon.core.ui.ColorPicker;
 import dev.cobalmoon.core.ui.Theme;
 import dev.cobalmoon.core.ui.Tr;
@@ -93,6 +94,7 @@ public final class HudEditor {
         left.bounds(4, 4, 120, screenH - 8);
         right.bounds(screenW - 124, 4, 120, screenH - 8);
         Widgets.setPickerOpener((title, get, set, rowY) -> openPicker(title, get, set, rowY));
+        dev.cobalmoon.core.modules.FightAnalysisModule.setReplayOpener(this::openReplay);
         rebuildLeft();
         rebuildRight();
     }
@@ -106,6 +108,19 @@ public final class HudEditor {
     }
 
     public ColorPicker picker() { return picker; }
+
+    // ---- fight replay -----------------------------------------------------------------------
+
+    private dev.cobalmoon.core.ui.ReplayView replay;
+
+    public void openReplay(List<dev.cobalmoon.core.fight.FightRecord> fights) {
+        picker = null;
+        replay = new dev.cobalmoon.core.ui.ReplayView(fights);
+    }
+
+    public dev.cobalmoon.core.ui.ReplayView replay() { return replay; }
+
+    public void closeReplay() { replay = null; }
 
     /** Switches between the full editor and the clean "move and resize" view. */
     public void setLayoutMode(boolean layout) {
@@ -195,8 +210,65 @@ public final class HudEditor {
             rows.add(new Widgets.Header(() -> Tr.of("cobalmoon.editor.client")));
             for (Setting<?> s : settings.all()) rows.add(Widgets.forSetting(s));
             rows.add(new Widgets.Label(() -> Tr.of("cobalmoon.editor.select_hint")));
+            rows.add(new Widgets.Header(() -> Tr.of("cobalmoon.share.title")));
+            rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.share.copy_all"), () -> copyCode(ConfigShare.Scope.ALL), true));
+            rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.share.copy_hud"), () -> copyCode(ConfigShare.Scope.HUD), false));
+            rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.share.paste"), this::pasteCode, false));
+            rows.add(new Widgets.Button(() -> Tr.of("cobalmoon.share.save_file"), this::saveCodeFile, false));
+            rows.add(new Widgets.Label(() -> shareStatus));
         }
         right.setRows(rows);
+    }
+
+    // ---- shareable configuration codes ----------------------------------------------------
+
+    private String shareStatus = "";
+
+    public String shareStatus() { return shareStatus; }
+
+    public String currentCode(ConfigShare.Scope scope) {
+        return ConfigShare.encode(ConfigShare.collect(modules.all(), scope, ConfigShare.NOT_SHARED));
+    }
+
+    public void copyCode(ConfigShare.Scope scope) {
+        String code = currentCode(scope);
+        net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(code);
+        shareStatus = Tr.of("cobalmoon.share.copied", code.length());
+        refreshRight();
+    }
+
+    public void pasteCode() {
+        importCode(net.minecraft.client.Minecraft.getInstance().keyboardHandler.getClipboard());
+    }
+
+    public void importCode(String code) {
+        try {
+            var result = ConfigShare.apply(modules, ConfigShare.decode(code), ConfigShare.NOT_SHARED);
+            shareStatus = Tr.of("cobalmoon.share.imported", result.applied())
+                    + (result.unknownModules().isEmpty() ? "" : " " + Tr.of("cobalmoon.share.unknown", String.join(", ", result.unknownModules())));
+            CobalmoonClient.flushConfig();
+        } catch (IllegalArgumentException e) {
+            shareStatus = Tr.of("cobalmoon.share.invalid", e.getMessage());
+        }
+        refreshRight();
+    }
+
+    private void saveCodeFile() {
+        try {
+            java.nio.file.Path dir = modules.store().root().resolve("exports");
+            java.nio.file.Files.createDirectories(dir);
+            String name = "cobalmoon-" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".cbm";
+            java.nio.file.Files.writeString(dir.resolve(name), currentCode(ConfigShare.Scope.ALL) + System.lineSeparator());
+            shareStatus = Tr.of("cobalmoon.share.saved", "config/cobalmoon/exports/" + name);
+        } catch (java.io.IOException e) {
+            shareStatus = Tr.of("cobalmoon.share.invalid", e.getMessage());
+        }
+        refreshRight();
+    }
+
+    /** Re-lays out the right panel so labels whose text changed get their new height. */
+    private void refreshRight() {
+        if (lastCanvas != null) right.layoutRows(lastCanvas);
     }
 
     private void resetLayout(HudElement e) {
@@ -238,6 +310,11 @@ public final class HudEditor {
         float prev = c.setAlpha(fade());
         try {
             c.fill(0, 0, screenW, screenH, Theme.scrim());
+            if (replay != null) {
+                c.nextLayer();
+                replay.render(c, mx, my, screenW, screenH);
+                return;
+            }
             if (dragging) {
                 int faint = Theme.withAlpha(DefaultTokens.LUNAR, 0x30);
                 c.fill(screenW / 2, 0, screenW / 2 + 1, screenH, faint);
@@ -324,6 +401,10 @@ public final class HudEditor {
         GuiCanvas c = lastCanvas;
         if (c == null) return false;
         Widgets.TextField.blur(); // a click on a text field focuses it again below
+        if (replay != null) {
+            replay.click(mx, my);
+            return true;
+        }
         if (picker != null) {
             if (picker.click(mx, my)) {
                 pickerDrag = true;
@@ -385,6 +466,10 @@ public final class HudEditor {
     }
 
     public boolean mouseDragged(double mx, double my) {
+        if (replay != null) {
+            replay.drag(mx);
+            return true;
+        }
         if (pickerDrag && picker != null) {
             picker.drag(mx, my);
             return true;
@@ -426,6 +511,7 @@ public final class HudEditor {
     }
 
     public boolean mouseReleased(double mx, double my, int button) {
+        if (replay != null) replay.release();
         if (pickerDrag) {
             pickerDrag = false;
             if (picker != null) picker.release();
@@ -475,6 +561,11 @@ public final class HudEditor {
 
     public boolean keyPressed(int key, boolean shift) {
         if (Widgets.TextField.key(key)) return true;
+        if (replay != null) {
+            if (key == 256) replay = null; // Esc closes the replay, not the editor
+            else replay.key(key);
+            return true;
+        }
         if (picker != null && (key == 256 || key == 257)) { // Esc / Enter close the colour picker
             picker = null;
             return true;

@@ -99,8 +99,12 @@ public final class CobalmoonClient implements ClientModInitializer {
         modules.register(new GameplayModules.ToggleSprint());
         GameplayModules.HotbarBinds hotbar = modules.register(new GameplayModules.HotbarBinds());
         modules.register(new GameplayModules.AutoMessages());
+        // Training & analysis
+        modules.register(new dev.cobalmoon.core.modules.FightAnalysisModule(store.root()));
+        modules.register(new dev.cobalmoon.core.modules.TrainingModule());
         // Other
         modules.register(new SafeServerModule(() -> modules, () -> combat.server(), store.root()));
+        modules.register(new dev.cobalmoon.core.modules.ServerProfilesModule(() -> modules, () -> combat.server(), store.root()));
 
         zoom.bindKey(Platform.registerKey("key.cobalmoon.zoom", GLFW_KEY_C));
         List<KeyMapping> slotKeys = new ArrayList<>();

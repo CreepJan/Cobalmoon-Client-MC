@@ -76,6 +76,30 @@ public final class ModuleManager implements ModuleRegistry {
         module.setEnabled(enabled);
     }
 
+    /**
+     * Applies only the parts present in {@code data} (enabled flag, settings, HUD layouts) and saves.
+     * Used by config import and server profiles; missing parts keep their current values.
+     */
+    public void importState(Module module, Map<?, ?> data) {
+        if (data.get("settings") instanceof Map<?, ?> settings) {
+            for (Setting<?> s : module.settings()) {
+                if (settings.containsKey(s.key())) s.fromJson(settings.get(s.key()));
+            }
+        }
+        if (data.get("hud") instanceof Map<?, ?> hud) {
+            for (HudElement e : module.hudElements()) {
+                if (hud.get(e.id()) instanceof Map<?, ?> layout) e.layout().fromJson(layout);
+            }
+        }
+        if (data.get("enabled") instanceof Boolean b) module.setEnabled(b);
+        markDirty(module);
+    }
+
+    /** Current state of one module, in the config-file format. */
+    public static Map<String, Object> snapshotOf(Module module) {
+        return snapshot(module);
+    }
+
     static Map<String, Object> snapshot(Module module) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("enabled", module.isEnabled());
