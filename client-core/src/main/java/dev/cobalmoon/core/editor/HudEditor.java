@@ -75,9 +75,9 @@ public final class HudEditor {
     public void init(int screenW, int screenH) {
         this.screenW = screenW;
         this.screenH = screenH;
-        int pw = Math.max(104, Math.min(150, screenW / 5));
-        left.bounds(4, 4, pw, screenH - 8);
-        right.bounds(screenW - pw - 14, 4, pw + 10, screenH - 8);
+        // Provisional size; fitPanels() sizes the panels to their content on every frame.
+        left.bounds(4, 4, 120, screenH - 8);
+        right.bounds(screenW - 124, 4, 120, screenH - 8);
         rebuildLeft();
         rebuildRight();
     }
@@ -175,8 +175,20 @@ public final class HudEditor {
         return 1f - (1f - t) * (1f - t) * (1f - t); // ease-out cubic
     }
 
+    /** Sizes both panels to their content (up to a third of the screen each) and wraps long texts. */
+    private void fitPanels(GuiCanvas c) {
+        int min = 104, max = Math.max(min, screenW * 32 / 100);
+        int lw = left.preferredWidth(c, min, max);
+        int rw = right.preferredWidth(c, min, max);
+        left.bounds(4, 4, lw, screenH - 8);
+        right.bounds(screenW - rw - 4, 4, rw, screenH - 8);
+        left.layoutRows(c);
+        right.layoutRows(c);
+    }
+
     public void render(GuiCanvas c, int mx, int my) {
         lastCanvas = c;
+        fitPanels(c);
         float prev = c.setAlpha(fade());
         try {
             c.fill(0, 0, screenW, screenH, Theme.scrim());

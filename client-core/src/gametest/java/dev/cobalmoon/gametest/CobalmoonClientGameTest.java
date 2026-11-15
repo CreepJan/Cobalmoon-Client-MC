@@ -28,6 +28,13 @@ public final class CobalmoonClientGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext ctx) {
+        // Spanish has the longest UI strings: run the visual checks in it.
+        java.util.concurrent.CompletableFuture<?> reload = ctx.computeOnClient(mc -> {
+            mc.getLanguageManager().setSelected("es_es");
+            return mc.reloadResourcePacks();
+        });
+        ctx.waitFor(mc -> reload.isDone(), 20 * 60);
+
         try (TestSingleplayerContext world = ctx.worldBuilder().create()) {
             ctx.waitTicks(40);
 

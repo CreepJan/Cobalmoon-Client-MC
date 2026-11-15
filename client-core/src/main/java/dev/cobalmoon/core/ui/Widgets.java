@@ -41,6 +41,12 @@ public final class Widgets {
         void release() {}
 
         boolean scroll(double amount) { return false; }
+
+        /** Width this row needs to show its text without truncation. */
+        int preferredWidth(GuiCanvas c) { return 0; }
+
+        /** Called with the final row width before rendering (for rows whose height depends on it). */
+        void layout(GuiCanvas c, int w) {}
     }
 
     public static final class Header extends Row {
@@ -50,21 +56,61 @@ public final class Widgets {
 
         @Override protected int height() { return 16; }
 
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(text.get().toUpperCase(Locale.ROOT)) + 14; }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
-            c.text(text.get().toUpperCase(Locale.ROOT), x + 6, y + 6, Theme.muted(), false);
+            c.text(ellipsize(c, text.get().toUpperCase(Locale.ROOT), w - 12), x + 6, y + 6, Theme.muted(), false);
         }
     }
 
+    /** Muted help text; wraps onto as many lines as needed instead of being cut. */
     public static final class Label extends Row {
         private final Supplier<String> text;
+        private List<String> lines = List.of();
 
         public Label(Supplier<String> text) { this.text = text; }
 
         @Override
-        void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
-            c.text(ellipsize(c, text.get(), w - 12), x + 6, y + 5, Theme.muted(), false);
+        void layout(GuiCanvas c, int w) {
+            lines = wrap(c, text.get(), w - 12);
         }
+
+        @Override protected int height() { return Math.max(1, lines.size()) * 10 + 8; }
+
+        @Override
+        void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
+            int ly = y + 5;
+            for (String l : lines) {
+                c.text(l, x + 6, ly, Theme.muted(), false);
+                ly += 10;
+            }
+        }
+    }
+
+    /** Greedy word wrap; words longer than the width are split. */
+    static List<String> wrap(GuiCanvas c, String text, int max) {
+        List<String> out = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.split(" ")) {
+            String candidate = line.isEmpty() ? word : line + " " + word;
+            if (c.textWidth(candidate) <= max) {
+                line.setLength(0);
+                line.append(candidate);
+                continue;
+            }
+            if (!line.isEmpty()) out.add(line.toString());
+            line.setLength(0);
+            while (c.textWidth(word) > max && word.length() > 1) {
+                int end = word.length();
+                while (end > 1 && c.textWidth(word.substring(0, end)) > max) end--;
+                out.add(word.substring(0, end));
+                word = word.substring(end);
+            }
+            line.append(word);
+        }
+        if (!line.isEmpty()) out.add(line.toString());
+        return out;
     }
 
     public static final class Toggle extends Row {
@@ -82,11 +128,20 @@ public final class Widgets {
             return new Toggle(() -> Tr.of(s.name()), s::get, s::set);
         }
 
+        private List<String> lines = List.of();
+
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(label.get()) + 46; }
+
+        @Override void layout(GuiCanvas c, int w) { lines = wrap(c, label.get(), w - 40); }
+
+        @Override protected int height() { return wrappedHeight(lines); }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
-            if (hovered) c.fill(x, y, x + w, y + ROW_H, Theme.hover());
-            c.text(ellipsize(c, label.get(), w - 40), x + 6, y + 5, Theme.text(), false);
-            drawSwitch(c, x + w - 28, y + 4, get.getAsBoolean());
+            int h = height();
+            if (hovered) c.fill(x, y, x + w, y + h, Theme.hover());
+            drawLines(c, lines, x + 6, y, h, Theme.text());
+            drawSwitch(c, x + w - 28, y + (h - 10) / 2, get.getAsBoolean());
         }
 
         @Override
@@ -117,6 +172,8 @@ public final class Widgets {
         }
 
         @Override protected int height() { return 26; }
+
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(label.get()) + c.textWidth(value.get()) + 22; }
 
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
@@ -162,6 +219,8 @@ public final class Widgets {
             return new Cycle(() -> Tr.of(s.name()), () -> Tr.of(s.label(s.get())), s::cycle);
         }
 
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(label.get()) + c.textWidth("‹ " + value.get() + " ›") + 22; }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
             if (hovered) c.fill(x, y, x + w, y + ROW_H, Theme.hover());
@@ -193,18 +252,28 @@ public final class Widgets {
             return new ColorPick(() -> Tr.of(s.name()), s::get, s::set);
         }
 
+        private List<String> lines = List.of();
+
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(label.get()) + 34; }
+
+        @Override void layout(GuiCanvas c, int w) { lines = wrap(c, label.get(), w - 30); }
+
+        @Override protected int height() { return wrappedHeight(lines); }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
-            if (hovered) c.fill(x, y, x + w, y + ROW_H, Theme.hover());
+            int h = height();
+            if (hovered) c.fill(x, y, x + w, y + h, Theme.hover());
             int argb = get.getAsInt();
             String hex = ColorSetting.toHex(argb);
             int sx = x + w - 18;
             if (hovered) {
-                // the hex code replaces the label while hovering, so the label never gets truncated otherwise
-                c.text(hex, x + 6, y + 5, Theme.muted(), false);
+                // the hex code replaces the label while hovering
+                drawLines(c, List.of(hex), x + 6, y, h, Theme.muted());
             } else {
-                c.text(ellipsize(c, label.get(), w - 30), x + 6, y + 5, Theme.text(), false);
+                drawLines(c, lines, x + 6, y, h, Theme.text());
             }
+            y += (h - ROW_H) / 2; // centre the swatch vertically
             // checkerboard under the swatch so transparency is visible
             c.fill(sx, y + 3, sx + 12, y + 15, 0xFF808080);
             c.fill(sx, y + 3, sx + 6, y + 9, 0xFFC0C0C0);
@@ -246,6 +315,8 @@ public final class Widgets {
 
         @Override protected int height() { return 22; }
 
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(label.get()) + 28; }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
             int bx1 = x + 6, bx2 = x + w - 6, by1 = y + 3, by2 = y + 19;
@@ -283,6 +354,8 @@ public final class Widgets {
             this.selected = selected;
         }
 
+        @Override int preferredWidth(GuiCanvas c) { return c.textWidth(name.get()) + 50; }
+
         @Override
         void render(GuiCanvas c, int x, int y, int w, int mx, int my, boolean hovered) {
             boolean sel = selected.getAsBoolean();
@@ -298,6 +371,20 @@ public final class Widgets {
             if (mx >= x + w - 32) toggle.run();
             else select.run();
             return true;
+        }
+    }
+
+    /** Row height for wrapped label lines: one line keeps the standard row height. */
+    static int wrappedHeight(List<String> lines) {
+        return lines.size() <= 1 ? ROW_H : lines.size() * 10 + 8;
+    }
+
+    /** Draws label lines vertically centred in a row of height h. */
+    static void drawLines(GuiCanvas c, List<String> lines, int x, int y, int h, int color) {
+        int ly = y + (h - (lines.size() * 10 - 2)) / 2;
+        for (String l : lines) {
+            c.text(l, x, ly, color, false);
+            ly += 10;
         }
     }
 
@@ -361,6 +448,19 @@ public final class Widgets {
         private void clampScroll() {
             int max = Math.max(0, contentHeight() - (y + h - contentTop()));
             scroll = Math.max(0, Math.min(max, scroll));
+        }
+
+        /** Width that fits the title and every row's text, clamped to [minW, maxW]. */
+        public int preferredWidth(GuiCanvas c, int minW, int maxW) {
+            int want = c.textWidth(title.get()) + 16;
+            for (Row r : rows) want = Math.max(want, r.preferredWidth(c) + 4);
+            return Math.max(minW, Math.min(maxW, want));
+        }
+
+        /** Lets rows whose height depends on the width (wrapped text) measure themselves. */
+        public void layoutRows(GuiCanvas c) {
+            for (Row r : rows) r.layout(c, w - 2);
+            clampScroll();
         }
 
         public boolean contains(double mx, double my) {
